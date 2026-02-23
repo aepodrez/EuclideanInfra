@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 3.0"
+      version = "~> 5.0"
     }
   }
 
@@ -11,10 +11,6 @@ terraform {
   backend "local" {
     path = "terraform.tfstate"
   }
-}
-
-provider "aws" {
-  region = var.region
 }
 
 # Data sources for account and region information
