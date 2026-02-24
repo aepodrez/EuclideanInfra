@@ -22,9 +22,9 @@ resource "aws_sfn_state_machine" "pipeline" {
         Parameters = {
           FunctionName = local.universe_lambda_arn
           Payload = {
-            "s3_bucket.$"   = "$.s3_bucket"
-            "s3_prefix.$"   = "$.s3_prefix"
-            "execution_id.$" = "$$.Execution.Id"
+            s3_prefix                = "universe/"
+            data_ingress_universe_key = "data-ingress/Static/universe.csv"
+            "execution_id.$"         = "$$.Execution.Id"
           }
         }
         ResultSelector = {
@@ -54,20 +54,16 @@ resource "aws_sfn_state_machine" "pipeline" {
                 Name = "data-ingress"
                 Environment = [
                   {
-                    Name  = "S3_BUCKET"
-                    Value = "$.s3_bucket"
-                  },
-                  {
                     Name  = "S3_PREFIX"
-                    Value = "$.s3_prefix"
+                    Value = "data-ingress"
                   },
                   {
                     Name  = "UNIVERSE_PATH"
-                    Value = "$.universe_result.s3_output_path"
+                    "Value.$" = "$.universe_result.s3_output_path"
                   },
                   {
                     Name  = "EXECUTION_ID"
-                    Value = "$$.Execution.Id"
+                    "Value.$" = "$$.Execution.Id"
                   }
                 ]
               }
@@ -75,8 +71,8 @@ resource "aws_sfn_state_machine" "pipeline" {
           }
         }
         ResultSelector = {
-          "statusCode.$"     = "$.Payload.statusCode"
-          "s3_output_path.$" = "$.Payload.s3_output_path"
+          statusCode       = 200
+          s3_output_prefix = "data-ingress"
         }
         ResultPath = "$.data_ingress_result"
         Next       = "RunAlphaModel"
@@ -87,11 +83,11 @@ resource "aws_sfn_state_machine" "pipeline" {
         Parameters = {
           FunctionName = local.alpha_model_lambda_arn
           Payload = {
-            "s3_bucket.$"        = "$.s3_bucket"
-            s3_prefix            = "alpha-model/"
-            "universe_path.$"     = "$.universe_result.s3_output_path"
-            data_ingress_prefix   = "data-ingress/"
-            "execution_id.$"      = "$$.Execution.Id"
+            s3_prefix              = "alpha-model"
+            "universe_path.$"      = "$.universe_result.s3_output_path"
+            "data_ingress_prefix.$" = "$.data_ingress_result.s3_output_prefix"
+            output_key             = "alpha-model/expected_returns.csv"
+            "execution_id.$"       = "$$.Execution.Id"
           }
         }
         ResultSelector = {
@@ -107,10 +103,14 @@ resource "aws_sfn_state_machine" "pipeline" {
         Parameters = {
           FunctionName = local.portfolio_construction_lambda_arn
           Payload = {
-            "s3_bucket.$"             = "$.s3_bucket"
-            s3_prefix                 = "portfolio-construction/"
-            "expected_returns_path.$"  = "$.alpha_model_result.s3_output_path"
-            "execution_id.$"          = "$$.Execution.Id"
+            s3_prefix                = "portfolio-construction"
+            "expected_returns_path.$" = "$.alpha_model_result.s3_output_path"
+            universe_path            = "data-ingress/Static/universe.csv"
+            daily_crsp_path          = "data-ingress/pyData/Intermediate/dailyCRSP.parquet"
+            ticker_map_path          = "data-ingress/pyData/Intermediate/ticker_to_permno.csv"
+            output_key               = "portfolio-construction/optimal_portfolio.csv"
+            meta_key                 = "portfolio-construction/optimal_portfolio_meta.json"
+            "execution_id.$"         = "$$.Execution.Id"
           }
         }
         ResultSelector = {
@@ -126,10 +126,11 @@ resource "aws_sfn_state_machine" "pipeline" {
         Parameters = {
           FunctionName = local.execution_model_lambda_arn
           Payload = {
-            "s3_bucket.$"               = "$.s3_bucket"
-            s3_prefix                   = "execution-model/"
-            "portfolio_weights_path.$"  = "$.portfolio_result.s3_output_path"
-            "execution_id.$"            = "$$.Execution.Id"
+            s3_prefix                  = "execution-model"
+            "portfolio_weights_path.$" = "$.portfolio_result.s3_output_path"
+            output_key                 = "execution-model/execution_report.json"
+            dry_run                    = true
+            "execution_id.$"           = "$$.Execution.Id"
           }
         }
         ResultSelector = {
