@@ -1,6 +1,6 @@
 # Locals for constructing ARNs based on naming conventions
 locals {
-  universe_lambda_arn                  = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-universe-${var.environment}"
+  universe_task_family                 = "${var.project_name}-universe-${var.environment}"
   alpha_model_lambda_arn              = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model-${var.environment}"
   portfolio_construction_lambda_arn   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-portfolio-construction-${var.environment}"
   execution_model_lambda_arn           = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
@@ -18,18 +18,43 @@ resource "aws_sfn_state_machine" "pipeline" {
     States  = {
       RunUniverse = {
         Type     = "Task"
-        Resource = "arn:aws:states:::lambda:invoke"
+        Resource = "arn:aws:states:::ecs:runTask.sync"
         Parameters = {
-          FunctionName = local.universe_lambda_arn
-          Payload = {
-            s3_prefix                = "universe/"
-            data_ingress_universe_key = "data-ingress/Static/universe.csv"
-            "execution_id.$"         = "$$.Execution.Id"
+          LaunchType     = "FARGATE"
+          Cluster        = aws_ecs_cluster.main.arn
+          TaskDefinition = local.universe_task_family
+          NetworkConfiguration = {
+            AwsvpcConfiguration = {
+              Subnets        = [for subnet in aws_subnet.public : subnet.id]
+              SecurityGroups = [aws_security_group.ecs.id]
+              AssignPublicIp = "ENABLED"
+            }
+          }
+          Overrides = {
+            ContainerOverrides = [
+              {
+                Name = "universe"
+                Environment = [
+                  {
+                    Name  = "S3_PREFIX"
+                    Value = "universe"
+                  },
+                  {
+                    Name  = "DATA_INGRESS_UNIVERSE_KEY"
+                    Value = "data-ingress/Static/universe.csv"
+                  },
+                  {
+                    Name  = "EXECUTION_ID"
+                    "Value.$" = "$$.Execution.Id"
+                  }
+                ]
+              }
+            ]
           }
         }
         ResultSelector = {
-          "statusCode.$"     = "$.Payload.statusCode"
-          "s3_output_path.$" = "$.Payload.s3_output_path"
+          statusCode     = 200
+          s3_output_path = "universe/universe.csv"
         }
         ResultPath = "$.universe_result"
         Next       = "RunDataIngress"

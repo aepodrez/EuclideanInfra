@@ -39,7 +39,10 @@ resource "aws_iam_role_policy" "step_function" {
       {
         Effect   = "Allow"
         Action   = ["ecs:RunTask"]
-        Resource = ["arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-${var.environment}:*"]
+        Resource = [
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-universe-${var.environment}:*",
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-${var.environment}:*"
+        ]
       },
       {
         Effect   = "Allow"
