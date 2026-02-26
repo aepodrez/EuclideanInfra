@@ -1,10 +1,11 @@
 # Locals for constructing ARNs based on naming conventions
 locals {
-  universe_task_family                 = "${var.project_name}-universe-${var.environment}"
+  universe_task_family                = "${var.project_name}-universe-${var.environment}"
   alpha_model_lambda_arn              = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model-${var.environment}"
   portfolio_construction_lambda_arn   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-portfolio-construction-${var.environment}"
-  execution_model_lambda_arn           = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
-  data_ingress_task_family             = "${var.project_name}-data-ingress-${var.environment}"
+  execution_model_lambda_arn          = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
+  data_ingress_downloads_task_family  = "${var.project_name}-data-ingress-downloads-${var.environment}"
+  data_ingress_predictors_task_family = "${var.project_name}-data-ingress-predictors-${var.environment}"
 }
 
 # Step Functions State Machine
@@ -15,7 +16,7 @@ resource "aws_sfn_state_machine" "pipeline" {
   definition = jsonencode({
     Comment = "Euclidean Trading Pipeline"
     StartAt = "RunUniverse"
-    States  = {
+    States = {
       RunUniverse = {
         Type     = "Task"
         Resource = "arn:aws:states:::ecs:runTask.sync"
@@ -44,7 +45,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                     Value = "data-ingress/Static/universe.csv"
                   },
                   {
-                    Name  = "EXECUTION_ID"
+                    Name      = "EXECUTION_ID"
                     "Value.$" = "$$.Execution.Id"
                   }
                 ]
@@ -57,15 +58,15 @@ resource "aws_sfn_state_machine" "pipeline" {
           s3_output_path = "universe/universe.csv"
         }
         ResultPath = "$.universe_result"
-        Next       = "RunDataIngress"
+        Next       = "RunDataIngressDownloads"
       }
-      RunDataIngress = {
+      RunDataIngressDownloads = {
         Type     = "Task"
         Resource = "arn:aws:states:::ecs:runTask.sync"
         Parameters = {
           LaunchType     = "FARGATE"
           Cluster        = aws_ecs_cluster.main.arn
-          TaskDefinition = local.data_ingress_task_family
+          TaskDefinition = local.data_ingress_downloads_task_family
           NetworkConfiguration = {
             AwsvpcConfiguration = {
               Subnets        = [for subnet in aws_subnet.public : subnet.id]
@@ -76,18 +77,44 @@ resource "aws_sfn_state_machine" "pipeline" {
           Overrides = {
             ContainerOverrides = [
               {
-                Name = "data-ingress"
+                Name = "crosssection-data"
                 Environment = [
                   {
-                    Name  = "S3_PREFIX"
-                    Value = "data-ingress"
-                  },
+                    Name      = "EXECUTION_ID"
+                    "Value.$" = "$$.Execution.Id"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        ResultSelector = {
+          statusCode = 200
+        }
+        ResultPath = "$.data_ingress_downloads_result"
+        Next       = "RunDataIngressPredictors"
+      }
+      RunDataIngressPredictors = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::ecs:runTask.sync"
+        Parameters = {
+          LaunchType     = "FARGATE"
+          Cluster        = aws_ecs_cluster.main.arn
+          TaskDefinition = local.data_ingress_predictors_task_family
+          NetworkConfiguration = {
+            AwsvpcConfiguration = {
+              Subnets        = [for subnet in aws_subnet.public : subnet.id]
+              SecurityGroups = [aws_security_group.ecs.id]
+              AssignPublicIp = "ENABLED"
+            }
+          }
+          Overrides = {
+            ContainerOverrides = [
+              {
+                Name = "crosssection-predictors"
+                Environment = [
                   {
-                    Name  = "UNIVERSE_PATH"
-                    "Value.$" = "$.universe_result.s3_output_path"
-                  },
-                  {
-                    Name  = "EXECUTION_ID"
+                    Name      = "EXECUTION_ID"
                     "Value.$" = "$$.Execution.Id"
                   }
                 ]
@@ -108,11 +135,11 @@ resource "aws_sfn_state_machine" "pipeline" {
         Parameters = {
           FunctionName = local.alpha_model_lambda_arn
           Payload = {
-            s3_prefix              = "alpha-model"
-            "universe_path.$"      = "$.universe_result.s3_output_path"
+            s3_prefix               = "alpha-model"
+            "universe_path.$"       = "$.universe_result.s3_output_path"
             "data_ingress_prefix.$" = "$.data_ingress_result.s3_output_prefix"
-            output_key             = "alpha-model/expected_returns.csv"
-            "execution_id.$"       = "$$.Execution.Id"
+            output_key              = "alpha-model/expected_returns.csv"
+            "execution_id.$"        = "$$.Execution.Id"
           }
         }
         ResultSelector = {
@@ -128,14 +155,14 @@ resource "aws_sfn_state_machine" "pipeline" {
         Parameters = {
           FunctionName = local.portfolio_construction_lambda_arn
           Payload = {
-            s3_prefix                = "portfolio-construction"
+            s3_prefix                 = "portfolio-construction"
             "expected_returns_path.$" = "$.alpha_model_result.s3_output_path"
-            universe_path            = "data-ingress/Static/universe.csv"
-            daily_crsp_path          = "data-ingress/pyData/Intermediate/dailyCRSP.parquet"
-            ticker_map_path          = "data-ingress/pyData/Intermediate/ticker_to_permno.csv"
-            output_key               = "portfolio-construction/optimal_portfolio.csv"
-            meta_key                 = "portfolio-construction/optimal_portfolio_meta.json"
-            "execution_id.$"         = "$$.Execution.Id"
+            universe_path             = "data-ingress/Static/universe.csv"
+            daily_crsp_path           = "data-ingress/pyData/Intermediate/dailyCRSP.parquet"
+            ticker_map_path           = "data-ingress/pyData/Intermediate/ticker_to_permno.csv"
+            output_key                = "portfolio-construction/optimal_portfolio.csv"
+            meta_key                  = "portfolio-construction/optimal_portfolio_meta.json"
+            "execution_id.$"          = "$$.Execution.Id"
           }
         }
         ResultSelector = {
