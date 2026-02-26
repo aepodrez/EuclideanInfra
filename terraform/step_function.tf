@@ -5,6 +5,7 @@ locals {
   portfolio_construction_lambda_arn   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-portfolio-construction-${var.environment}"
   execution_model_lambda_arn          = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
   data_ingress_downloads_task_family  = "${var.project_name}-data-ingress-downloads-${var.environment}"
+  data_ingress_refinitiv_task_family  = "${var.project_name}-data-ingress-refinitiv-${var.environment}"
   data_ingress_predictors_task_family = "${var.project_name}-data-ingress-predictors-${var.environment}"
 }
 
@@ -92,6 +93,40 @@ resource "aws_sfn_state_machine" "pipeline" {
           statusCode = 200
         }
         ResultPath = "$.data_ingress_downloads_result"
+        Next       = "RunDataIngressRefinitiv"
+      }
+      RunDataIngressRefinitiv = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::ecs:runTask.sync"
+        Parameters = {
+          LaunchType     = "FARGATE"
+          Cluster        = aws_ecs_cluster.main.arn
+          TaskDefinition = local.data_ingress_refinitiv_task_family
+          NetworkConfiguration = {
+            AwsvpcConfiguration = {
+              Subnets        = [for subnet in aws_subnet.public : subnet.id]
+              SecurityGroups = [aws_security_group.ecs.id]
+              AssignPublicIp = "ENABLED"
+            }
+          }
+          Overrides = {
+            ContainerOverrides = [
+              {
+                Name = "crosssection-refinitiv"
+                Environment = [
+                  {
+                    Name      = "EXECUTION_ID"
+                    "Value.$" = "$$.Execution.Id"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        ResultSelector = {
+          statusCode = 200
+        }
+        ResultPath = "$.data_ingress_refinitiv_result"
         Next       = "RunDataIngressPredictors"
       }
       RunDataIngressPredictors = {
