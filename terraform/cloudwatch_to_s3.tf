@@ -77,7 +77,10 @@ resource "aws_iam_role" "cloudwatch_logs_to_firehose" {
       {
         Effect = "Allow"
         Principal = {
-          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
+          Service = [
+            "logs.amazonaws.com",
+            "logs.${data.aws_region.current.name}.amazonaws.com"
+          ]
         }
         Action = "sts:AssumeRole"
       }
@@ -98,10 +101,14 @@ resource "aws_iam_role_policy" "cloudwatch_logs_to_firehose" {
       {
         Effect = "Allow"
         Action = [
+          "firehose:DescribeDeliveryStream",
           "firehose:PutRecord",
           "firehose:PutRecordBatch"
         ]
-        Resource = aws_kinesis_firehose_delivery_stream.cloudwatch_to_s3[0].arn
+        Resource = [
+          aws_kinesis_firehose_delivery_stream.cloudwatch_to_s3[0].arn,
+          "arn:aws:firehose:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:deliverystream/*"
+        ]
       }
     ]
   })
@@ -119,4 +126,8 @@ resource "aws_cloudwatch_log_account_policy" "all_logs_to_firehose" {
     FilterPattern  = ""
     Distribution   = "Random"
   })
+
+  depends_on = [
+    aws_iam_role_policy.cloudwatch_logs_to_firehose
+  ]
 }
