@@ -49,6 +49,16 @@ output "ecs_security_group_id" {
   value       = aws_security_group.ecs.id
 }
 
+output "cloudwatch_logs_firehose_stream_name" {
+  description = "Name of the Firehose stream used to archive CloudWatch Logs to S3"
+  value       = var.enable_cloudwatch_logs_archive_to_s3 ? aws_kinesis_firehose_delivery_stream.cloudwatch_to_s3[0].name : null
+}
+
+output "cloudwatch_logs_account_policy_name" {
+  description = "Name of the account-level CloudWatch Logs subscription policy"
+  value       = var.enable_cloudwatch_logs_archive_to_s3 ? aws_cloudwatch_log_account_policy.all_logs_to_firehose[0].policy_name : null
+}
+
 # SSM Parameters for child infrastructure references
 resource "aws_ssm_parameter" "s3_bucket_name" {
   name  = "/${var.project_name}/${var.environment}/s3_bucket_name"

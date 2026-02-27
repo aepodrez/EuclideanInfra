@@ -39,3 +39,15 @@ variable "public_subnet_cidrs" {
   type        = list(string)
   default     = ["10.0.101.0/24", "10.0.102.0/24"]
 }
+
+variable "enable_cloudwatch_logs_archive_to_s3" {
+  description = "Enable account-level CloudWatch Logs subscription to archive all logs to S3 through Firehose"
+  type        = bool
+  default     = true
+}
+
+variable "cloudwatch_logs_s3_prefix" {
+  description = "Top-level S3 prefix where CloudWatch Logs archives are written"
+  type        = string
+  default     = "cloudwatch-logs"
+}
