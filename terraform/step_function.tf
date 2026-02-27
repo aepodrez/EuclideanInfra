@@ -59,74 +59,89 @@ resource "aws_sfn_state_machine" "pipeline" {
           s3_output_path = "universe/universe.csv"
         }
         ResultPath = "$.universe_result"
-        Next       = "RunDataIngressDownloads"
+        Next       = "RunDataIngressParallel"
       }
-      RunDataIngressDownloads = {
-        Type     = "Task"
-        Resource = "arn:aws:states:::ecs:runTask.sync"
-        Parameters = {
-          LaunchType     = "FARGATE"
-          Cluster        = aws_ecs_cluster.main.arn
-          TaskDefinition = local.data_ingress_downloads_task_family
-          NetworkConfiguration = {
-            AwsvpcConfiguration = {
-              Subnets        = [for subnet in aws_subnet.public : subnet.id]
-              SecurityGroups = [aws_security_group.ecs.id]
-              AssignPublicIp = "ENABLED"
+      RunDataIngressParallel = {
+        Type = "Parallel"
+        Branches = [
+          {
+            StartAt = "RunDataIngressDownloads"
+            States = {
+              RunDataIngressDownloads = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          {
+                            Name      = "EXECUTION_ID"
+                            "Value.$" = "$$.Execution.Id"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = {
+                  statusCode = 200
+                }
+                End = true
+              }
+            }
+          },
+          {
+            StartAt = "RunDataIngressRefinitiv"
+            States = {
+              RunDataIngressRefinitiv = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_refinitiv_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-refinitiv"
+                        Environment = [
+                          {
+                            Name      = "EXECUTION_ID"
+                            "Value.$" = "$$.Execution.Id"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = {
+                  statusCode = 200
+                }
+                End = true
+              }
             }
           }
-          Overrides = {
-            ContainerOverrides = [
-              {
-                Name = "crosssection-data"
-                Environment = [
-                  {
-                    Name      = "EXECUTION_ID"
-                    "Value.$" = "$$.Execution.Id"
-                  }
-                ]
-              }
-            ]
-          }
-        }
-        ResultSelector = {
-          statusCode = 200
-        }
-        ResultPath = "$.data_ingress_downloads_result"
-        Next       = "RunDataIngressRefinitiv"
-      }
-      RunDataIngressRefinitiv = {
-        Type     = "Task"
-        Resource = "arn:aws:states:::ecs:runTask.sync"
-        Parameters = {
-          LaunchType     = "FARGATE"
-          Cluster        = aws_ecs_cluster.main.arn
-          TaskDefinition = local.data_ingress_refinitiv_task_family
-          NetworkConfiguration = {
-            AwsvpcConfiguration = {
-              Subnets        = [for subnet in aws_subnet.public : subnet.id]
-              SecurityGroups = [aws_security_group.ecs.id]
-              AssignPublicIp = "ENABLED"
-            }
-          }
-          Overrides = {
-            ContainerOverrides = [
-              {
-                Name = "crosssection-refinitiv"
-                Environment = [
-                  {
-                    Name      = "EXECUTION_ID"
-                    "Value.$" = "$$.Execution.Id"
-                  }
-                ]
-              }
-            ]
-          }
-        }
-        ResultSelector = {
-          statusCode = 200
-        }
-        ResultPath = "$.data_ingress_refinitiv_result"
+        ]
+        ResultPath = "$.data_ingress_parallel_result"
         Next       = "RunDataIngressPredictors"
       }
       RunDataIngressPredictors = {
