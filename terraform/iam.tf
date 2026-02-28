@@ -95,3 +95,25 @@ resource "aws_cloudwatch_log_group" "step_function" {
   retention_in_days = 7
   tags              = local.common_tags
 }
+
+resource "aws_iam_user_policy" "operator_stepfunctions_read" {
+  name = "${var.project_name}-operator-sfn-read-${var.environment}"
+  user = var.operator_iam_username
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "states:ListExecutions",
+          "states:DescribeExecution"
+        ]
+        Resource = [
+          aws_sfn_state_machine.pipeline.arn,
+          "arn:aws:states:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:execution:${aws_sfn_state_machine.pipeline.name}:*"
+        ]
+      }
+    ]
+  })
+}

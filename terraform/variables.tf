@@ -51,3 +51,9 @@ variable "cloudwatch_logs_s3_prefix" {
   type        = string
   default     = "cloudwatch-logs"
 }
+
+variable "operator_iam_username" {
+  description = "IAM username to grant Step Functions execution read permissions for operational log exports"
+  type        = string
+  default     = "apodrez"
+}
