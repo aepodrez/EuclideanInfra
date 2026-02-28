@@ -96,9 +96,9 @@ resource "aws_cloudwatch_log_group" "step_function" {
   tags              = local.common_tags
 }
 
-resource "aws_iam_user_policy" "operator_stepfunctions_read" {
-  name = "${var.project_name}-operator-sfn-read-${var.environment}"
-  user = var.operator_iam_username
+resource "aws_iam_policy" "operator_stepfunctions_read" {
+  name        = "${var.project_name}-operator-sfn-read-${var.environment}"
+  description = "Allow operator to list and inspect Step Functions executions for log export windows"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -116,4 +116,9 @@ resource "aws_iam_user_policy" "operator_stepfunctions_read" {
       }
     ]
   })
+}
+
+resource "aws_iam_user_policy_attachment" "operator_stepfunctions_read" {
+  user       = var.operator_iam_username
+  policy_arn = aws_iam_policy.operator_stepfunctions_read.arn
 }
