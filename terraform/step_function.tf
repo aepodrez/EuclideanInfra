@@ -737,6 +737,10 @@ resource "aws_sfn_state_machine" "pipeline" {
                   {
                     Name      = "EXECUTION_ID"
                     "Value.$" = "$$.Execution.Id"
+                  },
+                  {
+                    Name  = "CROSSSECTION_JOB_NAME"
+                    Value = "RunDataIngressPredictors"
                   }
                 ]
               }
