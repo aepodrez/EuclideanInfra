@@ -7,6 +7,147 @@ locals {
   data_ingress_downloads_task_family  = "${var.project_name}-data-ingress-downloads-${var.environment}"
   data_ingress_refinitiv_task_family  = "${var.project_name}-data-ingress-refinitiv-${var.environment}"
   data_ingress_predictors_task_family = "${var.project_name}-data-ingress-predictors-${var.environment}"
+
+  bulk_data_jobs = [
+    {
+      job_name         = "RunCRSPDaily"
+      script           = "DataDownloads/CRSPDaily.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet"])
+    },
+    {
+      job_name         = "RunCRSPDistributions"
+      script           = "DataDownloads/CRSPDistributions.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/CRSPdistributions.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/CRSPdistributions.parquet"])
+    },
+    {
+      job_name         = "RunBEAInputOutput"
+      script           = "DataDownloads/BEAInputOutput.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode([])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/BEA_Supply_Table.parquet", "pyData/Intermediate/BEA_Supply_Table.csv", "pyData/Intermediate/BEA_SupplyUse_Framework.parquet", "pyData/Intermediate/BEA_SupplyUse_Framework.csv"])
+      expected_outputs = jsonencode(["pyData/Intermediate/BEA_Supply_Table.parquet", "pyData/Intermediate/BEA_SupplyUse_Framework.parquet"])
+    },
+    {
+      job_name         = "RunCompustatAnnual"
+      script           = "DataDownloads/CompustatAnnual.py"
+      script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_annual"])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode(["Static/universe.csv"])
+      output_allowlist = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet", "pyData/Intermediate/compustat_annual/outputs/features.csv", "pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet"])
+    },
+    {
+      job_name         = "RunCompustatQuarterly"
+      script           = "DataDownloads/CompustatQuarterly.py"
+      script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_quarterly"])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode(["Static/universe.csv"])
+      output_allowlist = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_quarterly/outputs/m_QCompustatV2.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet"])
+    },
+    {
+      job_name         = "RunCompustatShortInterest"
+      script           = "DataDownloads/CompustatShortInterest.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode([])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/monthlyShortInterest.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/monthlyShortInterest.parquet"])
+    },
+    {
+      job_name         = "RunGNPDeflator"
+      script           = "DataDownloads/GNPDeflator.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode([])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/GNPdefl.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/GNPdefl.parquet"])
+    },
+    {
+      job_name         = "RunInstitutionalHoldings13F"
+      script           = "DataDownloads/InstitutionalHoldings13F.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/TR_13F.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/TR_13F.parquet"])
+    },
+    {
+      job_name         = "RunMarketReturns"
+      script           = "DataDownloads/MarketReturns.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/monthlyMarket.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/monthlyMarket.parquet"])
+    },
+    {
+      job_name         = "RunQFactorModel"
+      script           = "DataDownloads/QFactorModel.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode(["Static/universe.csv"])
+      output_allowlist = jsonencode(["pyData/Intermediate/d_qfactor_live.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/d_qfactor_live.parquet"])
+    },
+    {
+      job_name         = "RunTreasuryBill3M"
+      script           = "DataDownloads/TreasuryBill3M.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode([])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/TBill3M.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/TBill3M.parquet"])
+    },
+    {
+      job_name         = "RunVIX"
+      script           = "DataDownloads/VIX.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode([])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/d_vix.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/d_vix.parquet"])
+    },
+  ]
+
+  bulk_refinitiv_jobs = [
+    {
+      job_name         = "RunIBESEPSUnadjusted"
+      script           = "DataDownloads/IBESEPSUnadjusted.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/IBES_EPS_Unadj.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/IBES_EPS_Unadj.parquet"])
+    },
+    {
+      job_name         = "RunIBESUnadjustedActuals"
+      script           = "DataDownloads/IBESUnadjustedActuals.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/IBES_UnadjustedActuals.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/IBES_UnadjustedActuals.parquet"])
+    },
+    {
+      job_name         = "RunIBESRecommendations"
+      script           = "DataDownloads/IBESRecommendations.py"
+      script_args      = jsonencode([])
+      input_allowlist  = jsonencode(["Static/universe.csv"])
+      required_inputs  = jsonencode([])
+      output_allowlist = jsonencode(["pyData/Intermediate/IBES_Recommendations.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/IBES_Recommendations.parquet"])
+    },
+  ]
 }
 
 # Step Functions State Machine
@@ -59,15 +200,187 @@ resource "aws_sfn_state_machine" "pipeline" {
           s3_output_path = "universe/universe.csv"
         }
         ResultPath = "$.universe_result"
-        Next       = "RunDataIngressParallel"
+        Next       = "RunDataIngressJobGraph"
       }
-      RunDataIngressParallel = {
+      RunDataIngressJobGraph = {
         Type = "Parallel"
         Branches = [
           {
-            StartAt = "RunDataIngressDownloads"
+            StartAt = "SeedCoreParallel"
             States = {
-              RunDataIngressDownloads = {
+              SeedCoreParallel = {
+                Type = "Parallel"
+                Branches = [
+                  {
+                    StartAt = "RunCRSPMonthly"
+                    States = {
+                      RunCRSPMonthly = {
+                        Type     = "Task"
+                        Resource = "arn:aws:states:::ecs:runTask.sync"
+                        Parameters = {
+                          LaunchType     = "FARGATE"
+                          Cluster        = aws_ecs_cluster.main.arn
+                          TaskDefinition = local.data_ingress_downloads_task_family
+                          NetworkConfiguration = {
+                            AwsvpcConfiguration = {
+                              Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                              SecurityGroups = [aws_security_group.ecs.id]
+                              AssignPublicIp = "ENABLED"
+                            }
+                          }
+                          Overrides = {
+                            ContainerOverrides = [
+                              {
+                                Name = "crosssection-data"
+                                Environment = [
+                                  { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                  { Name = "CROSSSECTION_JOB_NAME", Value = "RunCRSPMonthly" },
+                                  { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CRSPMonthly.py" },
+                                  { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                                  { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
+                                  { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                                  { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\",\"pyData/Intermediate/ticker_to_permno.csv\",\"pyData/Intermediate/ticker_to_permno_monthly.csv\"]" },
+                                  { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\",\"pyData/Intermediate/ticker_to_permno.csv\",\"pyData/Intermediate/ticker_to_permno_monthly.csv\"]" },
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                        ResultSelector = { statusCode = 200 }
+                        End            = true
+                      }
+                    }
+                  },
+                  {
+                    StartAt = "RunIBESEPSAdjusted"
+                    States = {
+                      RunIBESEPSAdjusted = {
+                        Type     = "Task"
+                        Resource = "arn:aws:states:::ecs:runTask.sync"
+                        Parameters = {
+                          LaunchType     = "FARGATE"
+                          Cluster        = aws_ecs_cluster.main.arn
+                          TaskDefinition = local.data_ingress_refinitiv_task_family
+                          NetworkConfiguration = {
+                            AwsvpcConfiguration = {
+                              Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                              SecurityGroups = [aws_security_group.ecs.id]
+                              AssignPublicIp = "ENABLED"
+                            }
+                          }
+                          Overrides = {
+                            ContainerOverrides = [
+                              {
+                                Name = "crosssection-refinitiv"
+                                Environment = [
+                                  { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                  { Name = "CROSSSECTION_JOB_NAME", Value = "RunIBESEPSAdjusted" },
+                                  { Name = "CROSSSECTION_REFINITIV_SCRIPTS", Value = "DataDownloads/IBESEPSAdjusted.py" },
+                                  { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                                  { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
+                                  { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                                  { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
+                                  { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                        ResultSelector = { statusCode = 200 }
+                        End            = true
+                      }
+                    }
+                  }
+                ]
+                Next = "PostSeedDependentParallel"
+              }
+              PostSeedDependentParallel = {
+                Type = "Parallel"
+                Branches = [
+                  {
+                    StartAt = "RunCRSPAcquisitions"
+                    States = {
+                      RunCRSPAcquisitions = {
+                        Type     = "Task"
+                        Resource = "arn:aws:states:::ecs:runTask.sync"
+                        Parameters = {
+                          LaunchType     = "FARGATE"
+                          Cluster        = aws_ecs_cluster.main.arn
+                          TaskDefinition = local.data_ingress_downloads_task_family
+                          NetworkConfiguration = {
+                            AwsvpcConfiguration = {
+                              Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                              SecurityGroups = [aws_security_group.ecs.id]
+                              AssignPublicIp = "ENABLED"
+                            }
+                          }
+                          Overrides = {
+                            ContainerOverrides = [
+                              {
+                                Name = "crosssection-data"
+                                Environment = [
+                                  { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                  { Name = "CROSSSECTION_JOB_NAME", Value = "RunCRSPAcquisitions" },
+                                  { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CRSPAcquisitions.py" },
+                                  { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                                  { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\"]" },
+                                  { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\"]" },
+                                  { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/m_CRSPAcquisitions.parquet\"]" },
+                                  { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/m_CRSPAcquisitions.parquet\"]" },
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                        ResultSelector = { statusCode = 200 }
+                        End            = true
+                      }
+                    }
+                  },
+                  {
+                    StartAt = "RunIPODates"
+                    States = {
+                      RunIPODates = {
+                        Type     = "Task"
+                        Resource = "arn:aws:states:::ecs:runTask.sync"
+                        Parameters = {
+                          LaunchType     = "FARGATE"
+                          Cluster        = aws_ecs_cluster.main.arn
+                          TaskDefinition = local.data_ingress_downloads_task_family
+                          NetworkConfiguration = {
+                            AwsvpcConfiguration = {
+                              Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                              SecurityGroups = [aws_security_group.ecs.id]
+                              AssignPublicIp = "ENABLED"
+                            }
+                          }
+                          Overrides = {
+                            ContainerOverrides = [
+                              {
+                                Name = "crosssection-data"
+                                Environment = [
+                                  { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                  { Name = "CROSSSECTION_JOB_NAME", Value = "RunIPODates" },
+                                  { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/IPODates.py" },
+                                  { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                                  { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/ticker_to_permno.csv\",\"pyData/Intermediate/ticker_to_permno_monthly.csv\"]" },
+                                  { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                                  { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IPODates.parquet\",\"pyData/Intermediate/IPODates.csv\"]" },
+                                  { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/IPODates.parquet\"]" },
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                        ResultSelector = { statusCode = 200 }
+                        End            = true
+                      }
+                    }
+                  }
+                ]
+                Next = "RunIBESCRSPLink"
+              }
+              RunIBESCRSPLink = {
                 Type     = "Task"
                 Resource = "arn:aws:states:::ecs:runTask.sync"
                 Parameters = {
@@ -86,32 +399,29 @@ resource "aws_sfn_state_machine" "pipeline" {
                       {
                         Name = "crosssection-data"
                         Environment = [
-                          {
-                            Name      = "EXECUTION_ID"
-                            "Value.$" = "$$.Execution.Id"
-                          }
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunIBESCRSPLink" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/IBESCRSPLink.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\",\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\",\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IBESCRSPLinkingTable.parquet\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/IBESCRSPLinkingTable.parquet\"]" },
                         ]
                       }
                     ]
                   }
                 }
-                ResultSelector = {
-                  statusCode = 200
-                }
-                End = true
+                ResultSelector = { statusCode = 200 }
+                Next           = "RunSignalMasterTable"
               }
-            }
-          },
-          {
-            StartAt = "RunDataIngressRefinitiv"
-            States = {
-              RunDataIngressRefinitiv = {
+              RunSignalMasterTable = {
                 Type     = "Task"
                 Resource = "arn:aws:states:::ecs:runTask.sync"
                 Parameters = {
                   LaunchType     = "FARGATE"
                   Cluster        = aws_ecs_cluster.main.arn
-                  TaskDefinition = local.data_ingress_refinitiv_task_family
+                  TaskDefinition = local.data_ingress_downloads_task_family
                   NetworkConfiguration = {
                     AwsvpcConfiguration = {
                       Subnets        = [for subnet in aws_subnet.public : subnet.id]
@@ -122,26 +432,287 @@ resource "aws_sfn_state_machine" "pipeline" {
                   Overrides = {
                     ContainerOverrides = [
                       {
-                        Name = "crosssection-refinitiv"
+                        Name = "crosssection-data"
                         Environment = [
-                          {
-                            Name      = "EXECUTION_ID"
-                            "Value.$" = "$$.Execution.Id"
-                          }
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunSignalMasterTable" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "SignalMasterTable.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\",\"pyData/Intermediate/ticker_to_permno.csv\",\"pyData/Intermediate/ticker_to_permno_monthly.csv\",\"pyData/Intermediate/IBESCRSPLinkingTable.parquet\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\",\"pyData/Intermediate/ticker_to_permno.csv\"]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/SignalMasterTable.parquet\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/SignalMasterTable.parquet\"]" },
                         ]
                       }
                     ]
                   }
                 }
-                ResultSelector = {
-                  statusCode = 200
+                ResultSelector = { statusCode = 200 }
+                Next           = "RunCCMLinkingTable"
+              }
+              RunCCMLinkingTable = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunCCMLinkingTable" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CCMLinkingTable.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/SignalMasterTable.parquet\",\"pyData/Intermediate/ticker_to_permno.csv\",\"pyData/Intermediate/ticker_to_permno_monthly.csv\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"pyData/Intermediate/SignalMasterTable.parquet\"]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/CCMLinkingTable.parquet\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/CCMLinkingTable.parquet\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                End            = true
+              }
+            }
+          },
+          {
+            StartAt = "PrepareBulkDataJobs"
+            States = {
+              PrepareBulkDataJobs = {
+                Type       = "Pass"
+                Result     = local.bulk_data_jobs
+                ResultPath = "$.jobs"
+                Next       = "RunBulkDataJobs"
+              }
+              RunBulkDataJobs = {
+                Type           = "Map"
+                ItemsPath      = "$.jobs"
+                MaxConcurrency = 10
+                Iterator = {
+                  StartAt = "RunBulkDataJob"
+                  States = {
+                    RunBulkDataJob = {
+                      Type     = "Task"
+                      Resource = "arn:aws:states:::ecs:runTask.sync"
+                      Parameters = {
+                        LaunchType     = "FARGATE"
+                        Cluster        = aws_ecs_cluster.main.arn
+                        TaskDefinition = local.data_ingress_downloads_task_family
+                        NetworkConfiguration = {
+                          AwsvpcConfiguration = {
+                            Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                            SecurityGroups = [aws_security_group.ecs.id]
+                            AssignPublicIp = "ENABLED"
+                          }
+                        }
+                        Overrides = {
+                          ContainerOverrides = [
+                            {
+                              Name = "crosssection-data"
+                              Environment = [
+                                { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                { Name = "CROSSSECTION_JOB_NAME", "Value.$" = "$$.Map.Item.Value.job_name" },
+                                { Name = "CROSSSECTION_SCRIPT", "Value.$" = "$$.Map.Item.Value.script" },
+                                { Name = "CROSSSECTION_SCRIPT_ARGS", "Value.$" = "$$.Map.Item.Value.script_args" },
+                                { Name = "CROSSSECTION_INPUT_ALLOWLIST", "Value.$" = "$$.Map.Item.Value.input_allowlist" },
+                                { Name = "CROSSSECTION_REQUIRED_INPUTS", "Value.$" = "$$.Map.Item.Value.required_inputs" },
+                                { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", "Value.$" = "$$.Map.Item.Value.output_allowlist" },
+                                { Name = "CROSSSECTION_EXPECTED_OUTPUTS", "Value.$" = "$$.Map.Item.Value.expected_outputs" },
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                      ResultSelector = { statusCode = 200 }
+                      End            = true
+                    }
+                  }
                 }
                 End = true
               }
             }
+          },
+          {
+            StartAt = "PrepareBulkRefinitivJobs"
+            States = {
+              PrepareBulkRefinitivJobs = {
+                Type       = "Pass"
+                Result     = local.bulk_refinitiv_jobs
+                ResultPath = "$.jobs"
+                Next       = "RunBulkRefinitivJobs"
+              }
+              RunBulkRefinitivJobs = {
+                Type           = "Map"
+                ItemsPath      = "$.jobs"
+                MaxConcurrency = 4
+                Iterator = {
+                  StartAt = "RunBulkRefinitivJob"
+                  States = {
+                    RunBulkRefinitivJob = {
+                      Type     = "Task"
+                      Resource = "arn:aws:states:::ecs:runTask.sync"
+                      Parameters = {
+                        LaunchType     = "FARGATE"
+                        Cluster        = aws_ecs_cluster.main.arn
+                        TaskDefinition = local.data_ingress_refinitiv_task_family
+                        NetworkConfiguration = {
+                          AwsvpcConfiguration = {
+                            Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                            SecurityGroups = [aws_security_group.ecs.id]
+                            AssignPublicIp = "ENABLED"
+                          }
+                        }
+                        Overrides = {
+                          ContainerOverrides = [
+                            {
+                              Name = "crosssection-refinitiv"
+                              Environment = [
+                                { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                { Name = "CROSSSECTION_JOB_NAME", "Value.$" = "$$.Map.Item.Value.job_name" },
+                                { Name = "CROSSSECTION_REFINITIV_SCRIPTS", "Value.$" = "$$.Map.Item.Value.script" },
+                                { Name = "CROSSSECTION_SCRIPT_ARGS", "Value.$" = "$$.Map.Item.Value.script_args" },
+                                { Name = "CROSSSECTION_INPUT_ALLOWLIST", "Value.$" = "$$.Map.Item.Value.input_allowlist" },
+                                { Name = "CROSSSECTION_REQUIRED_INPUTS", "Value.$" = "$$.Map.Item.Value.required_inputs" },
+                                { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", "Value.$" = "$$.Map.Item.Value.output_allowlist" },
+                                { Name = "CROSSSECTION_EXPECTED_OUTPUTS", "Value.$" = "$$.Map.Item.Value.expected_outputs" },
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                      ResultSelector = { statusCode = 200 }
+                      End            = true
+                    }
+                  }
+                }
+                End = true
+              }
+            }
+          },
+          {
+            StartAt = "RunBuildFFPortfolios"
+            States = {
+              RunBuildFFPortfolios = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunBuildFFPortfolios" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/BuildFFPortfolios.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"Static/universe.csv\"]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"Static/ff3_portfolios.csv\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"Static/ff3_portfolios.csv\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Next           = "RunFamaFrenchDaily"
+              }
+              RunFamaFrenchDaily = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunFamaFrenchDaily" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/FamaFrenchDaily.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/ff3_portfolios.csv\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"Static/ff3_portfolios.csv\"]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/dailyFF.parquet\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/dailyFF.parquet\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Next           = "RunFamaFrenchMonthly"
+              }
+              RunFamaFrenchMonthly = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunFamaFrenchMonthly" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/FamaFrenchMonthly.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/monthlyFF.parquet\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/monthlyFF.parquet\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                End            = true
+              }
+            }
           }
         ]
-        ResultPath = "$.data_ingress_parallel_result"
+        ResultPath = "$.data_ingress_job_graph_result"
         Next       = "RunDataIngressPredictors"
       }
       RunDataIngressPredictors = {
