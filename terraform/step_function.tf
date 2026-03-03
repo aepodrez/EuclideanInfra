@@ -40,18 +40,18 @@ locals {
       job_name         = "RunCompustatAnnual"
       script           = "DataDownloads/CompustatAnnual.py"
       script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_annual"])
-      input_allowlist  = jsonencode(["Static/universe.csv"])
+      input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/compustat_annual/cache/"])
       required_inputs  = jsonencode(["Static/universe.csv"])
-      output_allowlist = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet", "pyData/Intermediate/compustat_annual/outputs/features.csv", "pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet", "pyData/Intermediate/compustat_annual/outputs/features.csv", "pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_annual/cache/"])
       expected_outputs = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet"])
     },
     {
       job_name         = "RunCompustatQuarterly"
       script           = "DataDownloads/CompustatQuarterly.py"
       script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_quarterly"])
-      input_allowlist  = jsonencode(["Static/universe.csv"])
+      input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/compustat_quarterly/cache/"])
       required_inputs  = jsonencode(["Static/universe.csv"])
-      output_allowlist = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_quarterly/outputs/m_QCompustatV2.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_quarterly/outputs/m_QCompustatV2.parquet", "pyData/Intermediate/compustat_quarterly/cache/"])
       expected_outputs = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet"])
     },
     {
