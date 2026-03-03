@@ -189,6 +189,10 @@ resource "aws_sfn_state_machine" "pipeline" {
                   {
                     Name      = "EXECUTION_ID"
                     "Value.$" = "$$.Execution.Id"
+                  },
+                  {
+                    Name      = "STEP_FUNCTION_STATE_NAME"
+                    "Value.$" = "$$.State.Name"
                   }
                 ]
               }
@@ -234,6 +238,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                                 Name = "crosssection-data"
                                 Environment = [
                                   { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                  { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                                   { Name = "CROSSSECTION_JOB_NAME", Value = "RunCRSPMonthly" },
                                   { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CRSPMonthly.py" },
                                   { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -274,6 +279,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                                 Name = "crosssection-refinitiv"
                                 Environment = [
                                   { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                  { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                                   { Name = "CROSSSECTION_JOB_NAME", Value = "RunIBESEPSAdjusted" },
                                   { Name = "CROSSSECTION_REFINITIV_SCRIPTS", Value = "DataDownloads/IBESEPSAdjusted.py" },
                                   { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -320,6 +326,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                                 Name = "crosssection-data"
                                 Environment = [
                                   { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                  { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                                   { Name = "CROSSSECTION_JOB_NAME", Value = "RunCRSPAcquisitions" },
                                   { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CRSPAcquisitions.py" },
                                   { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -360,6 +367,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                                 Name = "crosssection-data"
                                 Environment = [
                                   { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                  { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                                   { Name = "CROSSSECTION_JOB_NAME", Value = "RunIPODates" },
                                   { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/IPODates.py" },
                                   { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -400,6 +408,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                         Name = "crosssection-data"
                         Environment = [
                           { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                           { Name = "CROSSSECTION_JOB_NAME", Value = "RunIBESCRSPLink" },
                           { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/IBESCRSPLink.py" },
                           { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -435,6 +444,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                         Name = "crosssection-data"
                         Environment = [
                           { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                           { Name = "CROSSSECTION_JOB_NAME", Value = "RunSignalMasterTable" },
                           { Name = "CROSSSECTION_SCRIPT", Value = "SignalMasterTable.py" },
                           { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -470,6 +480,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                         Name = "crosssection-data"
                         Environment = [
                           { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                           { Name = "CROSSSECTION_JOB_NAME", Value = "RunCCMLinkingTable" },
                           { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CCMLinkingTable.py" },
                           { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -523,6 +534,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                               Name = "crosssection-data"
                               Environment = [
                                 { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                                 { Name = "CROSSSECTION_JOB_NAME", "Value.$" = "$.job_name" },
                                 { Name = "CROSSSECTION_SCRIPT", "Value.$" = "$.script" },
                                 { Name = "CROSSSECTION_SCRIPT_ARGS", "Value.$" = "$.script_args" },
@@ -580,6 +592,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                               Name = "crosssection-refinitiv"
                               Environment = [
                                 { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                                 { Name = "CROSSSECTION_JOB_NAME", "Value.$" = "$.job_name" },
                                 { Name = "CROSSSECTION_REFINITIV_SCRIPTS", "Value.$" = "$.script" },
                                 { Name = "CROSSSECTION_SCRIPT_ARGS", "Value.$" = "$.script_args" },
@@ -624,6 +637,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                         Name = "crosssection-data"
                         Environment = [
                           { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                           { Name = "CROSSSECTION_JOB_NAME", Value = "RunBuildFFPortfolios" },
                           { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/BuildFFPortfolios.py" },
                           { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -659,6 +673,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                         Name = "crosssection-data"
                         Environment = [
                           { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                           { Name = "CROSSSECTION_JOB_NAME", Value = "RunFamaFrenchDaily" },
                           { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/FamaFrenchDaily.py" },
                           { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -694,6 +709,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                         Name = "crosssection-data"
                         Environment = [
                           { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
                           { Name = "CROSSSECTION_JOB_NAME", Value = "RunFamaFrenchMonthly" },
                           { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/FamaFrenchMonthly.py" },
                           { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
@@ -737,6 +753,10 @@ resource "aws_sfn_state_machine" "pipeline" {
                   {
                     Name      = "EXECUTION_ID"
                     "Value.$" = "$$.Execution.Id"
+                  },
+                  {
+                    Name      = "STEP_FUNCTION_STATE_NAME"
+                    "Value.$" = "$$.State.Name"
                   },
                   {
                     Name  = "CROSSSECTION_JOB_NAME"
