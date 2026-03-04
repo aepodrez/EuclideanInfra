@@ -13,9 +13,9 @@ locals {
       job_name         = "RunCRSPDaily"
       script           = "DataDownloads/CRSPDaily.py"
       script_args      = jsonencode([])
-      input_allowlist  = jsonencode(["Static/universe.csv"])
+      input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet", "pyData/Intermediate/cache/crsp_daily/"])
       required_inputs  = jsonencode([])
-      output_allowlist = jsonencode(["pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet", "pyData/Intermediate/cache/crsp_daily/"])
       expected_outputs = jsonencode(["pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet"])
     },
     {
@@ -641,9 +641,9 @@ resource "aws_sfn_state_machine" "pipeline" {
                           { Name = "CROSSSECTION_JOB_NAME", Value = "RunBuildFFPortfolios" },
                           { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/BuildFFPortfolios.py" },
                           { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
-                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\",\"pyData/Intermediate/cache/build_ff_portfolios/\"]" },
                           { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"Static/universe.csv\"]" },
-                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"Static/ff3_portfolios.csv\"]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"Static/ff3_portfolios.csv\",\"pyData/Intermediate/cache/build_ff_portfolios/\"]" },
                           { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"Static/ff3_portfolios.csv\"]" },
                         ]
                       }
