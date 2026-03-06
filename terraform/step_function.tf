@@ -63,7 +63,7 @@ locals {
       script           = "DataDownloads/CompustatAnnual.py"
       script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_annual"])
       task_cpu         = "4096"
-      task_memory      = "16384"
+      task_memory      = "24576"
       input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/compustat_annual/cache/"])
       required_inputs  = jsonencode(["Static/universe.csv"])
       output_allowlist = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet", "pyData/Intermediate/compustat_annual/outputs/features.csv", "pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_annual/cache/"])
@@ -74,7 +74,7 @@ locals {
       script           = "DataDownloads/CompustatQuarterly.py"
       script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_quarterly"])
       task_cpu         = "4096"
-      task_memory      = "16384"
+      task_memory      = "24576"
       input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/compustat_quarterly/cache/"])
       required_inputs  = jsonencode(["Static/universe.csv"])
       output_allowlist = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_quarterly/outputs/m_QCompustatV2.parquet", "pyData/Intermediate/compustat_quarterly/cache/"])
