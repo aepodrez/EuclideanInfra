@@ -29,6 +29,8 @@ locals {
       job_name         = "RunCRSPDaily"
       script           = "DataDownloads/CRSPDaily.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet", "pyData/Intermediate/cache/crsp_daily/"])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet", "pyData/Intermediate/cache/crsp_daily/"])
@@ -38,6 +40,8 @@ locals {
       job_name         = "RunCRSPDistributions"
       script           = "DataDownloads/CRSPDistributions.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/CRSPdistributions.parquet"])
@@ -47,6 +51,8 @@ locals {
       job_name         = "RunBEAInputOutput"
       script           = "DataDownloads/BEAInputOutput.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode([])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/BEA_Supply_Table.parquet", "pyData/Intermediate/BEA_Supply_Table.csv", "pyData/Intermediate/BEA_SupplyUse_Framework.parquet", "pyData/Intermediate/BEA_SupplyUse_Framework.csv"])
@@ -56,6 +62,8 @@ locals {
       job_name         = "RunCompustatAnnual"
       script           = "DataDownloads/CompustatAnnual.py"
       script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_annual"])
+      task_cpu         = "4096"
+      task_memory      = "16384"
       input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/compustat_annual/cache/"])
       required_inputs  = jsonencode(["Static/universe.csv"])
       output_allowlist = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet", "pyData/Intermediate/compustat_annual/outputs/features.csv", "pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_annual/cache/"])
@@ -65,6 +73,8 @@ locals {
       job_name         = "RunCompustatQuarterly"
       script           = "DataDownloads/CompustatQuarterly.py"
       script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_quarterly"])
+      task_cpu         = "4096"
+      task_memory      = "16384"
       input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/compustat_quarterly/cache/"])
       required_inputs  = jsonencode(["Static/universe.csv"])
       output_allowlist = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_quarterly/outputs/m_QCompustatV2.parquet", "pyData/Intermediate/compustat_quarterly/cache/"])
@@ -74,6 +84,8 @@ locals {
       job_name         = "RunCompustatShortInterest"
       script           = "DataDownloads/CompustatShortInterest.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode([])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/monthlyShortInterest.parquet"])
@@ -83,6 +95,8 @@ locals {
       job_name         = "RunGNPDeflator"
       script           = "DataDownloads/GNPDeflator.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode([])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/GNPdefl.parquet"])
@@ -92,6 +106,8 @@ locals {
       job_name         = "RunInstitutionalHoldings13F"
       script           = "DataDownloads/InstitutionalHoldings13F.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/TR_13F.parquet"])
@@ -101,6 +117,8 @@ locals {
       job_name         = "RunMarketReturns"
       script           = "DataDownloads/MarketReturns.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/monthlyMarket.parquet"])
@@ -110,6 +128,8 @@ locals {
       job_name         = "RunQFactorModel"
       script           = "DataDownloads/QFactorModel.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode(["Static/universe.csv"])
       output_allowlist = jsonencode(["pyData/Intermediate/d_qfactor_live.parquet"])
@@ -119,6 +139,8 @@ locals {
       job_name         = "RunTreasuryBill3M"
       script           = "DataDownloads/TreasuryBill3M.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode([])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/TBill3M.parquet"])
@@ -128,6 +150,8 @@ locals {
       job_name         = "RunVIX"
       script           = "DataDownloads/VIX.py"
       script_args      = jsonencode([])
+      task_cpu         = "1024"
+      task_memory      = "4096"
       input_allowlist  = jsonencode([])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/d_vix.parquet"])
@@ -553,6 +577,8 @@ resource "aws_sfn_state_machine" "pipeline" {
                           }
                         }
                         Overrides = {
+                          "Cpu.$"    = "$.task_cpu"
+                          "Memory.$" = "$.task_memory"
                           ContainerOverrides = [
                             {
                               Name = "crosssection-data"
