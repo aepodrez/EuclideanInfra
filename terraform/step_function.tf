@@ -7,6 +7,22 @@ locals {
   data_ingress_downloads_task_family  = "${var.project_name}-data-ingress-downloads-${var.environment}"
   data_ingress_refinitiv_task_family  = "${var.project_name}-data-ingress-refinitiv-${var.environment}"
   data_ingress_predictors_task_family = "${var.project_name}-data-ingress-predictors-${var.environment}"
+  sfn_retry_ecs = [
+    {
+      ErrorEquals     = ["States.ALL"]
+      IntervalSeconds = 20
+      MaxAttempts     = 3
+      BackoffRate     = 2.0
+    }
+  ]
+  sfn_retry_lambda = [
+    {
+      ErrorEquals     = ["States.ALL"]
+      IntervalSeconds = 10
+      MaxAttempts     = 2
+      BackoffRate     = 2.0
+    }
+  ]
 
   bulk_data_jobs = [
     {
@@ -203,6 +219,7 @@ resource "aws_sfn_state_machine" "pipeline" {
           statusCode     = 200
           s3_output_path = "universe/universe.csv"
         }
+        Retry      = local.sfn_retry_ecs
         ResultPath = "$.universe_result"
         Next       = "RunDataIngressJobGraph"
       }
@@ -252,6 +269,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                           }
                         }
                         ResultSelector = { statusCode = 200 }
+                        Retry          = local.sfn_retry_ecs
                         End            = true
                       }
                     }
@@ -293,6 +311,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                           }
                         }
                         ResultSelector = { statusCode = 200 }
+                        Retry          = local.sfn_retry_ecs
                         End            = true
                       }
                     }
@@ -340,6 +359,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                           }
                         }
                         ResultSelector = { statusCode = 200 }
+                        Retry          = local.sfn_retry_ecs
                         End            = true
                       }
                     }
@@ -381,6 +401,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                           }
                         }
                         ResultSelector = { statusCode = 200 }
+                        Retry          = local.sfn_retry_ecs
                         End            = true
                       }
                     }
@@ -422,6 +443,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                   }
                 }
                 ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
                 Next           = "RunSignalMasterTable"
               }
               RunSignalMasterTable = {
@@ -458,6 +480,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                   }
                 }
                 ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
                 Next           = "RunCCMLinkingTable"
               }
               RunCCMLinkingTable = {
@@ -494,6 +517,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                   }
                 }
                 ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
                 End            = true
               }
             }
@@ -548,6 +572,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                         }
                       }
                       ResultSelector = { statusCode = 200 }
+                      Retry          = local.sfn_retry_ecs
                       End            = true
                     }
                   }
@@ -606,6 +631,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                         }
                       }
                       ResultSelector = { statusCode = 200 }
+                      Retry          = local.sfn_retry_ecs
                       End            = true
                     }
                   }
@@ -651,6 +677,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                   }
                 }
                 ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
                 Next           = "RunFamaFrenchDaily"
               }
               RunFamaFrenchDaily = {
@@ -687,6 +714,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                   }
                 }
                 ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
                 Next           = "RunFamaFrenchMonthly"
               }
               RunFamaFrenchMonthly = {
@@ -713,8 +741,8 @@ resource "aws_sfn_state_machine" "pipeline" {
                           { Name = "CROSSSECTION_JOB_NAME", Value = "RunFamaFrenchMonthly" },
                           { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/FamaFrenchMonthly.py" },
                           { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
-                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[]" },
-                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/ff3_portfolios.csv\",\"pyData/Intermediate/monthlyFF.parquet\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"Static/ff3_portfolios.csv\"]" },
                           { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/monthlyFF.parquet\"]" },
                           { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/monthlyFF.parquet\"]" },
                         ]
@@ -723,6 +751,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                   }
                 }
                 ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
                 End            = true
               }
             }
@@ -771,6 +800,7 @@ resource "aws_sfn_state_machine" "pipeline" {
           statusCode       = 200
           s3_output_prefix = "data-ingress"
         }
+        Retry      = local.sfn_retry_ecs
         ResultPath = "$.data_ingress_result"
         Next       = "RunAlphaModel"
       }
@@ -791,6 +821,7 @@ resource "aws_sfn_state_machine" "pipeline" {
           "statusCode.$"     = "$.Payload.statusCode"
           "s3_output_path.$" = "$.Payload.s3_output_path"
         }
+        Retry      = local.sfn_retry_lambda
         ResultPath = "$.alpha_model_result"
         Next       = "RunPortfolioConstruction"
       }
@@ -814,6 +845,7 @@ resource "aws_sfn_state_machine" "pipeline" {
           "statusCode.$"     = "$.Payload.statusCode"
           "s3_output_path.$" = "$.Payload.s3_output_path"
         }
+        Retry      = local.sfn_retry_lambda
         ResultPath = "$.portfolio_result"
         Next       = "RunExecutionModel"
       }
@@ -834,6 +866,7 @@ resource "aws_sfn_state_machine" "pipeline" {
           "statusCode.$"     = "$.Payload.statusCode"
           "s3_output_path.$" = "$.Payload.s3_output_path"
         }
+        Retry      = local.sfn_retry_lambda
         ResultPath = "$.execution_result"
         End        = true
       }
