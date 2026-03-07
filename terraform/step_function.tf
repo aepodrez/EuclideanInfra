@@ -1,12 +1,14 @@
 # Locals for constructing ARNs based on naming conventions
 locals {
-  universe_task_family                = "${var.project_name}-universe-${var.environment}"
-  alpha_model_lambda_arn              = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model-${var.environment}"
-  portfolio_construction_lambda_arn   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-portfolio-construction-${var.environment}"
-  execution_model_lambda_arn          = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
-  data_ingress_downloads_task_family  = "${var.project_name}-data-ingress-downloads-${var.environment}"
-  data_ingress_refinitiv_task_family  = "${var.project_name}-data-ingress-refinitiv-${var.environment}"
-  data_ingress_predictors_task_family = "${var.project_name}-data-ingress-predictors-${var.environment}"
+  universe_task_family                         = "${var.project_name}-universe-${var.environment}"
+  alpha_model_lambda_arn                       = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model-${var.environment}"
+  portfolio_construction_lambda_arn            = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-portfolio-construction-${var.environment}"
+  execution_model_lambda_arn                   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
+  data_ingress_downloads_task_family           = "${var.project_name}-data-ingress-downloads-${var.environment}"
+  data_ingress_compustat_annual_task_family    = "${var.project_name}-data-ingress-compustat-annual-${var.environment}"
+  data_ingress_compustat_quarterly_task_family = "${var.project_name}-data-ingress-compustat-quarterly-${var.environment}"
+  data_ingress_refinitiv_task_family           = "${var.project_name}-data-ingress-refinitiv-${var.environment}"
+  data_ingress_predictors_task_family          = "${var.project_name}-data-ingress-predictors-${var.environment}"
   sfn_retry_ecs = [
     {
       ErrorEquals     = ["States.ALL"]
@@ -29,6 +31,7 @@ locals {
       job_name         = "RunCRSPDaily"
       script           = "DataDownloads/CRSPDaily.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/dailyCRSP.parquet", "pyData/Intermediate/dailyCRSPprc.parquet", "pyData/Intermediate/cache/crsp_daily/"])
@@ -40,6 +43,7 @@ locals {
       job_name         = "RunCRSPDistributions"
       script           = "DataDownloads/CRSPDistributions.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv"])
@@ -51,6 +55,7 @@ locals {
       job_name         = "RunBEAInputOutput"
       script           = "DataDownloads/BEAInputOutput.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode([])
@@ -62,8 +67,9 @@ locals {
       job_name         = "RunCompustatAnnual"
       script           = "DataDownloads/CompustatAnnual.py"
       script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_annual"])
-      task_cpu         = "4096"
-      task_memory      = "24576"
+      task_definition  = local.data_ingress_compustat_annual_task_family
+      task_cpu         = "8192"
+      task_memory      = "32768"
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode(["Static/universe.csv"])
       output_allowlist = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet", "pyData/Intermediate/compustat_annual/outputs/features.csv", "pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet"])
@@ -73,8 +79,9 @@ locals {
       job_name         = "RunCompustatQuarterly"
       script           = "DataDownloads/CompustatQuarterly.py"
       script_args      = jsonencode(["--universe_csv", "../Static/universe.csv", "--output_dir", "../pyData/Intermediate/compustat_quarterly"])
-      task_cpu         = "4096"
-      task_memory      = "24576"
+      task_definition  = local.data_ingress_compustat_quarterly_task_family
+      task_cpu         = "8192"
+      task_memory      = "32768"
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode(["Static/universe.csv"])
       output_allowlist = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_quarterly/outputs/m_QCompustatV2.parquet"])
@@ -84,6 +91,7 @@ locals {
       job_name         = "RunCompustatShortInterest"
       script           = "DataDownloads/CompustatShortInterest.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode([])
@@ -95,6 +103,7 @@ locals {
       job_name         = "RunGNPDeflator"
       script           = "DataDownloads/GNPDeflator.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode([])
@@ -106,6 +115,7 @@ locals {
       job_name         = "RunInstitutionalHoldings13F"
       script           = "DataDownloads/InstitutionalHoldings13F.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv"])
@@ -117,6 +127,7 @@ locals {
       job_name         = "RunMarketReturns"
       script           = "DataDownloads/MarketReturns.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv"])
@@ -128,6 +139,7 @@ locals {
       job_name         = "RunQFactorModel"
       script           = "DataDownloads/QFactorModel.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode(["Static/universe.csv"])
@@ -139,6 +151,7 @@ locals {
       job_name         = "RunTreasuryBill3M"
       script           = "DataDownloads/TreasuryBill3M.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode([])
@@ -150,6 +163,7 @@ locals {
       job_name         = "RunVIX"
       script           = "DataDownloads/VIX.py"
       script_args      = jsonencode([])
+      task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
       input_allowlist  = jsonencode([])
@@ -566,9 +580,9 @@ resource "aws_sfn_state_machine" "pipeline" {
                       Type     = "Task"
                       Resource = "arn:aws:states:::ecs:runTask.sync"
                       Parameters = {
-                        LaunchType     = "FARGATE"
-                        Cluster        = aws_ecs_cluster.main.arn
-                        TaskDefinition = local.data_ingress_downloads_task_family
+                        LaunchType         = "FARGATE"
+                        Cluster            = aws_ecs_cluster.main.arn
+                        "TaskDefinition.$" = "$.task_definition"
                         NetworkConfiguration = {
                           AwsvpcConfiguration = {
                             Subnets        = [for subnet in aws_subnet.public : subnet.id]
