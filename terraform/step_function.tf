@@ -72,8 +72,8 @@ locals {
       task_memory      = "10240"
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode(["Static/universe.csv"])
-      output_allowlist = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet", "pyData/Intermediate/compustat_annual/outputs/features.csv", "pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet"])
-      expected_outputs = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/compustat_annual/outputs/features.parquet", "pyData/Intermediate/compustat_annual/outputs/features.csv", "pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet", "pyData/Intermediate/a_aCompustat.parquet", "pyData/Intermediate/m_aCompustat.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/a_aCompustat.parquet", "pyData/Intermediate/m_aCompustat.parquet"])
     },
     {
       job_name         = "RunCompustatQuarterly"
@@ -84,8 +84,8 @@ locals {
       task_memory      = "10240"
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode(["Static/universe.csv"])
-      output_allowlist = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet", "pyData/Intermediate/compustat_quarterly/outputs/m_QCompustatV2.parquet"])
-      expected_outputs = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv", "pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet", "pyData/Intermediate/m_QCompustat.parquet"])
+      expected_outputs = jsonencode(["pyData/Intermediate/m_QCompustat.parquet"])
     },
     {
       job_name         = "RunCompustatShortInterest"
@@ -830,6 +830,10 @@ resource "aws_sfn_state_machine" "pipeline" {
                   {
                     Name  = "CROSSSECTION_JOB_NAME"
                     Value = "RunDataIngressPredictors"
+                  },
+                  {
+                    Name  = "CROSSSECTION_REQUIRED_INPUTS"
+                    Value = "[\"pyData/Intermediate/monthlyCRSP.parquet\",\"pyData/Intermediate/dailyCRSP.parquet\",\"pyData/Intermediate/ticker_to_permno.csv\",\"pyData/Intermediate/ticker_to_permno_monthly.csv\",\"pyData/Intermediate/a_aCompustat.parquet\",\"pyData/Intermediate/m_aCompustat.parquet\",\"pyData/Intermediate/m_QCompustat.parquet\",\"pyData/Intermediate/monthlyFF.parquet\",\"pyData/Intermediate/dailyFF.parquet\",\"pyData/Intermediate/monthlyMarket.parquet\",\"pyData/Intermediate/TR_13F.parquet\",\"pyData/Intermediate/IBES_EPS_Adj.parquet\",\"pyData/Intermediate/IBES_EPS_Unadj.parquet\",\"pyData/Intermediate/IBES_UnadjustedActuals.parquet\",\"pyData/Intermediate/IBES_Recommendations.parquet\",\"pyData/Intermediate/IBESCRSPLinkingTable.parquet\"]"
                   }
                 ]
               }
@@ -860,10 +864,41 @@ resource "aws_sfn_state_machine" "pipeline" {
         ResultSelector = {
           "statusCode.$"     = "$.Payload.statusCode"
           "s3_output_path.$" = "$.Payload.s3_output_path"
+          "row_count.$"      = "$.Payload.row_count"
+          "used_fallback.$"  = "$.Payload.used_fallback"
+          "warning.$"        = "$.Payload.warning"
         }
         Retry      = local.sfn_retry_lambda
         ResultPath = "$.alpha_model_result"
-        Next       = "RunPortfolioConstruction"
+        Next       = "CheckAlphaModelResult"
+      }
+      CheckAlphaModelResult = {
+        Type = "Choice"
+        Choices = [
+          {
+            And = [
+              {
+                Variable      = "$.alpha_model_result.statusCode"
+                NumericEquals = 200
+              },
+              {
+                Variable      = "$.alpha_model_result.used_fallback"
+                BooleanEquals = false
+              },
+              {
+                Variable           = "$.alpha_model_result.row_count"
+                NumericGreaterThan = 0
+              }
+            ]
+            Next = "RunPortfolioConstruction"
+          }
+        ]
+        Default = "AlphaModelFailed"
+      }
+      AlphaModelFailed = {
+        Type  = "Fail"
+        Error = "AlphaModelFailed"
+        Cause = "Alpha model failed, used fallback, or produced no rows."
       }
       RunPortfolioConstruction = {
         Type     = "Task"
@@ -884,10 +919,37 @@ resource "aws_sfn_state_machine" "pipeline" {
         ResultSelector = {
           "statusCode.$"     = "$.Payload.statusCode"
           "s3_output_path.$" = "$.Payload.s3_output_path"
+          "s3_meta_path.$"   = "$.Payload.s3_meta_path"
+          "used_fallback.$"  = "$.Payload.used_fallback"
+          "warning.$"        = "$.Payload.warning"
         }
         Retry      = local.sfn_retry_lambda
         ResultPath = "$.portfolio_result"
-        Next       = "RunExecutionModel"
+        Next       = "CheckPortfolioConstructionResult"
+      }
+      CheckPortfolioConstructionResult = {
+        Type = "Choice"
+        Choices = [
+          {
+            And = [
+              {
+                Variable      = "$.portfolio_result.statusCode"
+                NumericEquals = 200
+              },
+              {
+                Variable      = "$.portfolio_result.used_fallback"
+                BooleanEquals = false
+              }
+            ]
+            Next = "RunExecutionModel"
+          }
+        ]
+        Default = "PortfolioConstructionFailed"
+      }
+      PortfolioConstructionFailed = {
+        Type  = "Fail"
+        Error = "PortfolioConstructionFailed"
+        Cause = "Portfolio construction failed or used fallback."
       }
       RunExecutionModel = {
         Type     = "Task"
@@ -903,12 +965,41 @@ resource "aws_sfn_state_machine" "pipeline" {
           }
         }
         ResultSelector = {
-          "statusCode.$"     = "$.Payload.statusCode"
-          "s3_output_path.$" = "$.Payload.s3_output_path"
+          "statusCode.$"       = "$.Payload.statusCode"
+          "s3_output_path.$"   = "$.Payload.s3_output_path"
+          "execution_status.$" = "$.Payload.execution_status"
+          "dry_run.$"          = "$.Payload.dry_run"
         }
         Retry      = local.sfn_retry_lambda
         ResultPath = "$.execution_result"
-        End        = true
+        Next       = "CheckExecutionModelResult"
+      }
+      CheckExecutionModelResult = {
+        Type = "Choice"
+        Choices = [
+          {
+            And = [
+              {
+                Variable      = "$.execution_result.statusCode"
+                NumericEquals = 200
+              },
+              {
+                Variable     = "$.execution_result.execution_status"
+                StringEquals = "ok"
+              }
+            ]
+            Next = "ExecutionSucceeded"
+          }
+        ]
+        Default = "ExecutionModelFailed"
+      }
+      ExecutionSucceeded = {
+        Type = "Succeed"
+      }
+      ExecutionModelFailed = {
+        Type  = "Fail"
+        Error = "ExecutionModelFailed"
+        Cause = "Execution model reported an error."
       }
     }
   })
