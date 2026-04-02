@@ -13,7 +13,7 @@ locals {
     {
       ErrorEquals     = ["States.ALL"]
       IntervalSeconds = 20
-      MaxAttempts     = 3
+      MaxAttempts     = 0
       BackoffRate     = 2.0
     }
   ]
