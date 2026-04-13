@@ -180,7 +180,7 @@ locals {
       script_args      = jsonencode([])
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode([])
-      output_allowlist = jsonencode(["pyData/Intermediate/IBES_EPS_Unadj.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/IBES_EPS_Unadj.parquet", "pyData/Intermediate/IBES_EPS_Unadj.checkpoint.parquet", "pyData/Intermediate/IBES_EPS_Unadj.checkpoint.json"])
       expected_outputs = jsonencode(["pyData/Intermediate/IBES_EPS_Unadj.parquet"])
     },
     {
@@ -189,7 +189,7 @@ locals {
       script_args      = jsonencode([])
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode([])
-      output_allowlist = jsonencode(["pyData/Intermediate/IBES_UnadjustedActuals.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/IBES_UnadjustedActuals.parquet", "pyData/Intermediate/IBES_UnadjustedActuals.checkpoint.parquet", "pyData/Intermediate/IBES_UnadjustedActuals.checkpoint.json"])
       expected_outputs = jsonencode(["pyData/Intermediate/IBES_UnadjustedActuals.parquet"])
     },
     {
@@ -198,7 +198,7 @@ locals {
       script_args      = jsonencode([])
       input_allowlist  = jsonencode(["Static/universe.csv"])
       required_inputs  = jsonencode([])
-      output_allowlist = jsonencode(["pyData/Intermediate/IBES_Recommendations.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/IBES_Recommendations.parquet", "pyData/Intermediate/IBES_Recommendations.checkpoint.parquet", "pyData/Intermediate/IBES_Recommendations.checkpoint.json"])
       expected_outputs = jsonencode(["pyData/Intermediate/IBES_Recommendations.parquet"])
     },
   ]
@@ -341,7 +341,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                                   { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
                                   { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
                                   { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
-                                  { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
+                                  { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.json\"]" },
                                   { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
                                 ]
                               }
