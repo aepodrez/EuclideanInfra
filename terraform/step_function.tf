@@ -311,50 +311,103 @@ resource "aws_sfn_state_machine" "pipeline" {
                         End            = true
                       }
                     }
-                  },
-                  {
-                    StartAt = "RunIBESEPSAdjusted"
-                    States = {
-                      RunIBESEPSAdjusted = {
-                        Type     = "Task"
-                        Resource = "arn:aws:states:::ecs:runTask.sync"
-                        Parameters = {
-                          LaunchType     = "FARGATE"
-                          Cluster        = aws_ecs_cluster.main.arn
-                          TaskDefinition = local.data_ingress_refinitiv_task_family
-                          NetworkConfiguration = {
-                            AwsvpcConfiguration = {
-                              Subnets        = [for subnet in aws_subnet.public : subnet.id]
-                              SecurityGroups = [aws_security_group.ecs.id]
-                              AssignPublicIp = "ENABLED"
-                            }
-                          }
-                          Overrides = {
-                            ContainerOverrides = [
-                              {
-                                Name = "crosssection-refinitiv"
-                                Environment = [
-                                  { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
-                                  { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
-                                  { Name = "CROSSSECTION_JOB_NAME", Value = "RunIBESEPSAdjusted" },
-                                  { Name = "CROSSSECTION_REFINITIV_SCRIPTS", Value = "DataDownloads/IBESEPSAdjusted.py" },
-                                  { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
-                                  { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\", \"pyData/Intermediate/IBES_EPS_Adj.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.json\"]" },
-                                  { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
-                                  { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.json\"]" },
-                                  { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
-                                ]
-                              }
-                            ]
-                          }
-                        }
-                        ResultSelector = { statusCode = 200 }
-                        Retry          = local.sfn_retry_ecs
-                        End            = true
-                      }
-                    }
                   }
                 ]
+                Next = "RunAllRefinitivJobsSequentially"
+              }
+              RunAllRefinitivJobsSequentially = {
+                Type = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_refinitiv_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-refinitiv"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunIBESEPSAdjusted" },
+                          { Name = "CROSSSECTION_REFINITIV_SCRIPTS", Value = "DataDownloads/IBESEPSAdjusted.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\", \"pyData/Intermediate/IBES_EPS_Adj.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.json\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.json\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
+                          { Name = "FINRA_CLIENT_ID", Value = var.finra_client_id },
+                          { Name = "FINRA_CLIENT_PASSWORD", Value = var.finra_client_password },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
+                Next           = "PrepareBulkRefinitivJobs"
+              }
+              PrepareBulkRefinitivJobs = {
+                Type       = "Pass"
+                Result     = local.bulk_refinitiv_jobs
+                ResultPath = "$.jobs"
+                Next       = "RunBulkRefinitivJobs"
+              }
+              RunBulkRefinitivJobs = {
+                Type           = "Map"
+                ItemsPath      = "$.jobs"
+                MaxConcurrency = 1
+                Iterator = {
+                  StartAt = "RunBulkRefinitivJob"
+                  States = {
+                    RunBulkRefinitivJob = {
+                      Type     = "Task"
+                      Resource = "arn:aws:states:::ecs:runTask.sync"
+                      Parameters = {
+                        LaunchType     = "FARGATE"
+                        Cluster        = aws_ecs_cluster.main.arn
+                        TaskDefinition = local.data_ingress_refinitiv_task_family
+                        NetworkConfiguration = {
+                          AwsvpcConfiguration = {
+                            Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                            SecurityGroups = [aws_security_group.ecs.id]
+                            AssignPublicIp = "ENABLED"
+                          }
+                        }
+                        Overrides = {
+                          ContainerOverrides = [
+                            {
+                              Name = "crosssection-refinitiv"
+                              Environment = [
+                                { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                                { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
+                                { Name = "CROSSSECTION_JOB_NAME", "Value.$" = "$.job_name" },
+                                { Name = "CROSSSECTION_REFINITIV_SCRIPTS", "Value.$" = "$.script" },
+                                { Name = "CROSSSECTION_SCRIPT_ARGS", "Value.$" = "$.script_args" },
+                                { Name = "CROSSSECTION_INPUT_ALLOWLIST", "Value.$" = "$.input_allowlist" },
+                                { Name = "CROSSSECTION_REQUIRED_INPUTS", "Value.$" = "$.required_inputs" },
+                                { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", "Value.$" = "$.output_allowlist" },
+                                { Name = "CROSSSECTION_EXPECTED_OUTPUTS", "Value.$" = "$.expected_outputs" },
+                                { Name = "FINRA_CLIENT_ID", Value = var.finra_client_id },
+                                { Name = "FINRA_CLIENT_PASSWORD", Value = var.finra_client_password },
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                      ResultSelector = { statusCode = 200 }
+                      Retry          = local.sfn_retry_ecs
+                      End            = true
+                    }
+                  }
+                }
                 Next = "PostSeedDependentParallel"
               }
               PostSeedDependentParallel = {
@@ -608,65 +661,6 @@ resource "aws_sfn_state_machine" "pipeline" {
                                 { Name = "CROSSSECTION_EXPECTED_OUTPUTS", "Value.$" = "$.expected_outputs" },
                                 { Name = "FINRA_CLIENT_ID", Value = var.finra_client_id },
                                 { Name = "FINRA_CLIENT_PASSWORD", Value = var.finra_client_password },
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                      ResultSelector = { statusCode = 200 }
-                      Retry          = local.sfn_retry_ecs
-                      End            = true
-                    }
-                  }
-                }
-                End = true
-              }
-            }
-          },
-          {
-            StartAt = "PrepareBulkRefinitivJobs"
-            States = {
-              PrepareBulkRefinitivJobs = {
-                Type       = "Pass"
-                Result     = local.bulk_refinitiv_jobs
-                ResultPath = "$.jobs"
-                Next       = "RunBulkRefinitivJobs"
-              }
-              RunBulkRefinitivJobs = {
-                Type           = "Map"
-                ItemsPath      = "$.jobs"
-                MaxConcurrency = 4
-                Iterator = {
-                  StartAt = "RunBulkRefinitivJob"
-                  States = {
-                    RunBulkRefinitivJob = {
-                      Type     = "Task"
-                      Resource = "arn:aws:states:::ecs:runTask.sync"
-                      Parameters = {
-                        LaunchType     = "FARGATE"
-                        Cluster        = aws_ecs_cluster.main.arn
-                        TaskDefinition = local.data_ingress_refinitiv_task_family
-                        NetworkConfiguration = {
-                          AwsvpcConfiguration = {
-                            Subnets        = [for subnet in aws_subnet.public : subnet.id]
-                            SecurityGroups = [aws_security_group.ecs.id]
-                            AssignPublicIp = "ENABLED"
-                          }
-                        }
-                        Overrides = {
-                          ContainerOverrides = [
-                            {
-                              Name = "crosssection-refinitiv"
-                              Environment = [
-                                { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
-                                { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
-                                { Name = "CROSSSECTION_JOB_NAME", "Value.$" = "$.job_name" },
-                                { Name = "CROSSSECTION_REFINITIV_SCRIPTS", "Value.$" = "$.script" },
-                                { Name = "CROSSSECTION_SCRIPT_ARGS", "Value.$" = "$.script_args" },
-                                { Name = "CROSSSECTION_INPUT_ALLOWLIST", "Value.$" = "$.input_allowlist" },
-                                { Name = "CROSSSECTION_REQUIRED_INPUTS", "Value.$" = "$.required_inputs" },
-                                { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", "Value.$" = "$.output_allowlist" },
-                                { Name = "CROSSSECTION_EXPECTED_OUTPUTS", "Value.$" = "$.expected_outputs" },
                               ]
                             }
                           ]
