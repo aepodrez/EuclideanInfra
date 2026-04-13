@@ -178,7 +178,7 @@ locals {
       job_name         = "RunIBESEPSUnadjusted"
       script           = "DataDownloads/IBESEPSUnadjusted.py"
       script_args      = jsonencode([])
-      input_allowlist  = jsonencode(["Static/universe.csv"])
+      input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/IBES_EPS_Unadj.parquet", "pyData/Intermediate/IBES_EPS_Unadj.checkpoint.parquet", "pyData/Intermediate/IBES_EPS_Unadj.checkpoint.json"])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/IBES_EPS_Unadj.parquet", "pyData/Intermediate/IBES_EPS_Unadj.checkpoint.parquet", "pyData/Intermediate/IBES_EPS_Unadj.checkpoint.json"])
       expected_outputs = jsonencode(["pyData/Intermediate/IBES_EPS_Unadj.parquet"])
@@ -187,7 +187,7 @@ locals {
       job_name         = "RunIBESUnadjustedActuals"
       script           = "DataDownloads/IBESUnadjustedActuals.py"
       script_args      = jsonencode([])
-      input_allowlist  = jsonencode(["Static/universe.csv"])
+      input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/IBES_UnadjustedActuals.parquet", "pyData/Intermediate/IBES_UnadjustedActuals.checkpoint.parquet", "pyData/Intermediate/IBES_UnadjustedActuals.checkpoint.json"])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/IBES_UnadjustedActuals.parquet", "pyData/Intermediate/IBES_UnadjustedActuals.checkpoint.parquet", "pyData/Intermediate/IBES_UnadjustedActuals.checkpoint.json"])
       expected_outputs = jsonencode(["pyData/Intermediate/IBES_UnadjustedActuals.parquet"])
@@ -196,7 +196,7 @@ locals {
       job_name         = "RunIBESRecommendations"
       script           = "DataDownloads/IBESRecommendations.py"
       script_args      = jsonencode([])
-      input_allowlist  = jsonencode(["Static/universe.csv"])
+      input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/IBES_Recommendations.parquet", "pyData/Intermediate/IBES_Recommendations.checkpoint.parquet", "pyData/Intermediate/IBES_Recommendations.checkpoint.json"])
       required_inputs  = jsonencode([])
       output_allowlist = jsonencode(["pyData/Intermediate/IBES_Recommendations.parquet", "pyData/Intermediate/IBES_Recommendations.checkpoint.parquet", "pyData/Intermediate/IBES_Recommendations.checkpoint.json"])
       expected_outputs = jsonencode(["pyData/Intermediate/IBES_Recommendations.parquet"])
@@ -339,7 +339,7 @@ resource "aws_sfn_state_machine" "pipeline" {
                                   { Name = "CROSSSECTION_JOB_NAME", Value = "RunIBESEPSAdjusted" },
                                   { Name = "CROSSSECTION_REFINITIV_SCRIPTS", Value = "DataDownloads/IBESEPSAdjusted.py" },
                                   { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
-                                  { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
+                                  { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\", \"pyData/Intermediate/IBES_EPS_Adj.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.json\"]" },
                                   { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
                                   { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.json\"]" },
                                   { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
@@ -606,6 +606,8 @@ resource "aws_sfn_state_machine" "pipeline" {
                                 { Name = "CROSSSECTION_REQUIRED_INPUTS", "Value.$" = "$.required_inputs" },
                                 { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", "Value.$" = "$.output_allowlist" },
                                 { Name = "CROSSSECTION_EXPECTED_OUTPUTS", "Value.$" = "$.expected_outputs" },
+                                { Name = "FINRA_CLIENT_ID", Value = var.finra_client_id },
+                                { Name = "FINRA_CLIENT_PASSWORD", Value = var.finra_client_password },
                               ]
                             }
                           ]
