@@ -94,9 +94,9 @@ locals {
       task_definition  = local.data_ingress_downloads_task_family
       task_cpu         = "1024"
       task_memory      = "4096"
-      input_allowlist  = jsonencode([])
+      input_allowlist  = jsonencode(["pyData/Intermediate/monthlyShortInterest.parquet", "pyData/Intermediate/monthlyShortInterest.checkpoint.parquet", "pyData/Intermediate/monthlyShortInterest.checkpoint.json", "pyData/Intermediate/m_aCompustat.parquet"])
       required_inputs  = jsonencode([])
-      output_allowlist = jsonencode(["pyData/Intermediate/monthlyShortInterest.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/monthlyShortInterest.parquet", "pyData/Intermediate/monthlyShortInterest.checkpoint.parquet", "pyData/Intermediate/monthlyShortInterest.checkpoint.json"])
       expected_outputs = jsonencode(["pyData/Intermediate/monthlyShortInterest.parquet"])
     },
     {
