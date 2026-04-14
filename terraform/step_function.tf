@@ -104,11 +104,11 @@ locals {
       script           = "DataDownloads/InstitutionalHoldings13F.py"
       script_args      = jsonencode([])
       task_definition  = local.data_ingress_downloads_task_family
-      task_cpu         = "1024"
-      task_memory      = "4096"
-      input_allowlist  = jsonencode(["Static/universe.csv"])
+      task_cpu         = "2048"
+      task_memory      = "16384"
+      input_allowlist  = jsonencode(["Static/universe.csv", "pyData/Intermediate/TR_13F.parquet", "pyData/Intermediate/.cache/13F_holdings_cache.parquet"])
       required_inputs  = jsonencode([])
-      output_allowlist = jsonencode(["pyData/Intermediate/TR_13F.parquet"])
+      output_allowlist = jsonencode(["pyData/Intermediate/TR_13F.parquet", "pyData/Intermediate/.cache/13F_holdings_cache.parquet"])
       expected_outputs = jsonencode(["pyData/Intermediate/TR_13F.parquet"])
     },
     {
