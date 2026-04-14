@@ -363,7 +363,7 @@ resource "aws_sfn_state_machine" "pipeline" {
               RunBulkRefinitivJobs = {
                 Type           = "Map"
                 ItemsPath      = "$.jobs"
-                MaxConcurrency = 1
+                MaxConcurrency = 3
                 Iterator = {
                   StartAt = "RunBulkRefinitivJob"
                   States = {
