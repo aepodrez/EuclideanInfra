@@ -62,12 +62,10 @@ variable "finra_client_id" {
   description = "FINRA API Client ID for ConsolidatedShortInterest endpoint"
   type        = string
   sensitive   = true
-  default     = ""
 }
 
 variable "finra_client_password" {
   description = "FINRA API Client Password for ConsolidatedShortInterest endpoint"
   type        = string
   sensitive   = true
-  default     = ""
 }
