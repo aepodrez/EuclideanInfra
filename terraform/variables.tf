@@ -57,15 +57,3 @@ variable "operator_iam_username" {
   type        = string
   default     = "apodrez"
 }
-
-variable "finra_client_id" {
-  description = "FINRA API Client ID for ConsolidatedShortInterest endpoint"
-  type        = string
-  sensitive   = true
-}
-
-variable "finra_client_password" {
-  description = "FINRA API Client Password for ConsolidatedShortInterest endpoint"
-  type        = string
-  sensitive   = true
-}

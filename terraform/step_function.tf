@@ -417,8 +417,6 @@ resource "aws_sfn_state_machine" "pipeline" {
                           { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
                           { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.parquet\", \"pyData/Intermediate/IBES_EPS_Adj.checkpoint.json\"]" },
                           { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/IBES_EPS_Adj.parquet\"]" },
-                          { Name = "FINRA_CLIENT_ID", Value = var.finra_client_id },
-                          { Name = "FINRA_CLIENT_PASSWORD", Value = var.finra_client_password },
                         ]
                       }
                     ]
@@ -469,8 +467,6 @@ resource "aws_sfn_state_machine" "pipeline" {
                                 { Name = "CROSSSECTION_REQUIRED_INPUTS", "Value.$" = "$.required_inputs" },
                                 { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", "Value.$" = "$.output_allowlist" },
                                 { Name = "CROSSSECTION_EXPECTED_OUTPUTS", "Value.$" = "$.expected_outputs" },
-                                { Name = "FINRA_CLIENT_ID", Value = var.finra_client_id },
-                                { Name = "FINRA_CLIENT_PASSWORD", Value = var.finra_client_password },
                               ]
                             }
                           ]
@@ -532,8 +528,6 @@ resource "aws_sfn_state_machine" "pipeline" {
                                 { Name = "CROSSSECTION_REQUIRED_INPUTS", "Value.$" = "$.required_inputs" },
                                 { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", "Value.$" = "$.output_allowlist" },
                                 { Name = "CROSSSECTION_EXPECTED_OUTPUTS", "Value.$" = "$.expected_outputs" },
-                                { Name = "FINRA_CLIENT_ID", Value = var.finra_client_id },
-                                { Name = "FINRA_CLIENT_PASSWORD", Value = var.finra_client_password },
                               ]
                             }
                           ]
@@ -705,8 +699,6 @@ resource "aws_sfn_state_machine" "pipeline" {
                           { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"pyData/Intermediate/m_aCompustat.parquet\"]" },
                           { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/monthlyShortInterest.parquet\",\"pyData/Intermediate/monthlyShortInterest.checkpoint.parquet\",\"pyData/Intermediate/monthlyShortInterest.checkpoint.json\"]" },
                           { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/monthlyShortInterest.parquet\"]" },
-                          { Name = "FINRA_CLIENT_ID", Value = var.finra_client_id },
-                          { Name = "FINRA_CLIENT_PASSWORD", Value = var.finra_client_password },
                         ]
                       }
                     ]
