@@ -32,7 +32,6 @@ resource "aws_iam_role_policy" "step_function" {
         Resource = [
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-universe-${var.environment}",
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model-${var.environment}",
-          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-portfolio-construction-${var.environment}",
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
         ]
       },
@@ -45,7 +44,8 @@ resource "aws_iam_role_policy" "step_function" {
           "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-compustat-annual-${var.environment}:*",
           "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-compustat-quarterly-${var.environment}:*",
           "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-refinitiv-${var.environment}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-predictors-${var.environment}:*"
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-predictors-${var.environment}:*",
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-portfolio-construction-${var.environment}:*"
         ]
       },
       {

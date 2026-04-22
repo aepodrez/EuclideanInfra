@@ -2,7 +2,7 @@
 locals {
   universe_task_family                         = "${var.project_name}-universe-${var.environment}"
   alpha_model_lambda_arn                       = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model-${var.environment}"
-  portfolio_construction_lambda_arn            = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-portfolio-construction-${var.environment}"
+  portfolio_construction_task_family           = "${var.project_name}-portfolio-construction-${var.environment}"
   execution_model_lambda_arn                   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
   data_ingress_downloads_task_family           = "${var.project_name}-data-ingress-downloads-${var.environment}"
   data_ingress_compustat_annual_task_family    = "${var.project_name}-data-ingress-compustat-annual-${var.environment}"
@@ -937,54 +937,42 @@ resource "aws_sfn_state_machine" "pipeline" {
       }
       RunPortfolioConstruction = {
         Type     = "Task"
-        Resource = "arn:aws:states:::lambda:invoke"
+        Resource = "arn:aws:states:::ecs:runTask.sync"
         Parameters = {
-          FunctionName = local.portfolio_construction_lambda_arn
-          Payload = {
-            s3_prefix                 = "portfolio-construction"
-            "expected_returns_path.$" = "$.alpha_model_result.s3_output_path"
-            universe_path             = "data-ingress/Static/universe.csv"
-            daily_crsp_path           = "data-ingress/pyData/Intermediate/dailyCRSP.parquet"
-            ticker_map_path           = "data-ingress/pyData/Intermediate/ticker_to_permno.csv"
-            output_key                = "portfolio-construction/optimal_portfolio.csv"
-            meta_key                  = "portfolio-construction/optimal_portfolio_meta.json"
-            "execution_id.$"          = "$$.Execution.Id"
+          LaunchType     = "FARGATE"
+          Cluster        = aws_ecs_cluster.main.arn
+          TaskDefinition = local.portfolio_construction_task_family
+          NetworkConfiguration = {
+            AwsvpcConfiguration = {
+              Subnets        = [for subnet in aws_subnet.public : subnet.id]
+              SecurityGroups = [aws_security_group.ecs.id]
+              AssignPublicIp = "ENABLED"
+            }
+          }
+          Overrides = {
+            ContainerOverrides = [
+              {
+                Name = "portfolio-construction"
+                Environment = [
+                  { Name = "S3_EXPECTED_RETURNS_KEY", "Value.$" = "$.alpha_model_result.s3_output_path" },
+                  { Name = "S3_UNIVERSE_KEY", Value = "data-ingress/Static/universe.csv" },
+                  { Name = "S3_CRSP_PARQUET_KEY", Value = "data-ingress/pyData/Intermediate/dailyCRSP.parquet" },
+                  { Name = "S3_TICKER_MAP_KEY", Value = "data-ingress/pyData/Intermediate/ticker_to_permno.csv" },
+                  { Name = "S3_OUTPUT_KEY", Value = "portfolio-construction/optimal_portfolio.csv" },
+                  { Name = "S3_OUTPUT_META_KEY", Value = "portfolio-construction/optimal_portfolio_meta.json" },
+                ]
+              }
+            ]
           }
         }
         ResultSelector = {
-          "statusCode.$"     = "$.Payload.statusCode"
-          "s3_output_path.$" = "$.Payload.s3_output_path"
-          "s3_meta_path.$"   = "$.Payload.s3_meta_path"
-          "used_fallback.$"  = "$.Payload.used_fallback"
-          "warning.$"        = "$.Payload.warning"
+          statusCode     = 200
+          s3_output_path = "portfolio-construction/optimal_portfolio.csv"
+          s3_meta_path   = "portfolio-construction/optimal_portfolio_meta.json"
         }
-        Retry      = local.sfn_retry_lambda
+        Retry      = local.sfn_retry_ecs
         ResultPath = "$.portfolio_result"
-        Next       = "CheckPortfolioConstructionResult"
-      }
-      CheckPortfolioConstructionResult = {
-        Type = "Choice"
-        Choices = [
-          {
-            And = [
-              {
-                Variable      = "$.portfolio_result.statusCode"
-                NumericEquals = 200
-              },
-              {
-                Variable      = "$.portfolio_result.used_fallback"
-                BooleanEquals = false
-              }
-            ]
-            Next = "RunExecutionModel"
-          }
-        ]
-        Default = "PortfolioConstructionFailed"
-      }
-      PortfolioConstructionFailed = {
-        Type  = "Fail"
-        Error = "PortfolioConstructionFailed"
-        Cause = "Portfolio construction failed or used fallback."
+        Next       = "RunExecutionModel"
       }
       RunExecutionModel = {
         Type     = "Task"
