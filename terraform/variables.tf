@@ -57,3 +57,9 @@ variable "operator_iam_username" {
   type        = string
   default     = "apodrez"
 }
+
+variable "github_cicd_iam_username" {
+  description = "IAM username used by GitHub Actions CI/CD to push images and register ECS task definitions"
+  type        = string
+  default     = "github-cicd"
+}

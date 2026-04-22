@@ -124,3 +124,25 @@ resource "aws_iam_user_policy_attachment" "operator_stepfunctions_read" {
   user       = var.operator_iam_username
   policy_arn = aws_iam_policy.operator_stepfunctions_read.arn
 }
+
+# Allow github-cicd to pass any euclidean-* role to ECS when registering task definitions
+resource "aws_iam_user_policy" "github_cicd_ecs_pass_role" {
+  name = "${var.project_name}-github-cicd-ecs-pass-role-${var.environment}"
+  user = var.github_cicd_iam_username
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-*"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ecs-tasks.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
