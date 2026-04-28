@@ -983,7 +983,7 @@ resource "aws_sfn_state_machine" "pipeline" {
             s3_prefix                  = "execution-model"
             "portfolio_weights_path.$" = "$.portfolio_result.s3_output_path"
             output_key                 = "execution-model/execution_report.json"
-            dry_run                    = true
+            dry_run                    = false
             "execution_id.$"           = "$$.Execution.Id"
           }
         }
