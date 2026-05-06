@@ -17,6 +17,7 @@ resource "aws_sns_topic_policy" "pipeline_notifications" {
 }
 
 resource "aws_sns_topic_subscription" "sms" {
+  count     = var.notification_phone_number != "" ? 1 : 0
   topic_arn = aws_sns_topic.pipeline_notifications.arn
   protocol  = "sms"
   endpoint  = var.notification_phone_number

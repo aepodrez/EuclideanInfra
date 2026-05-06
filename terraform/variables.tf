@@ -65,7 +65,8 @@ variable "github_cicd_iam_username" {
 }
 
 variable "notification_phone_number" {
-  description = "E.164 phone number for pipeline SMS alerts (e.g. +15551234567)"
+  description = "E.164 phone number for pipeline SMS alerts (e.g. +15551234567). Leave empty to skip SMS subscription."
   type        = string
   sensitive   = true
+  default     = ""
 }
