@@ -1,14 +1,14 @@
 # Locals for constructing ARNs based on naming conventions
 locals {
-  universe_task_family                         = "${var.project_name}-universe-${var.environment}"
-  alpha_model_lambda_arn                       = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model-${var.environment}"
-  portfolio_construction_task_family           = "${var.project_name}-portfolio-construction-${var.environment}"
-  execution_model_lambda_arn                   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
-  data_ingress_downloads_task_family           = "${var.project_name}-data-ingress-downloads-${var.environment}"
-  data_ingress_compustat_annual_task_family    = "${var.project_name}-data-ingress-compustat-annual-${var.environment}"
-  data_ingress_compustat_quarterly_task_family = "${var.project_name}-data-ingress-compustat-quarterly-${var.environment}"
-  data_ingress_refinitiv_task_family           = "${var.project_name}-data-ingress-refinitiv-${var.environment}"
-  data_ingress_predictors_task_family          = "${var.project_name}-data-ingress-predictors-${var.environment}"
+  universe_task_family                         = "${var.project_name}-universe${local.env_suffix}"
+  alpha_model_lambda_arn                       = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model${local.env_suffix}"
+  portfolio_construction_task_family           = "${var.project_name}-portfolio-construction${local.env_suffix}"
+  execution_model_lambda_arn                   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model${local.env_suffix}"
+  data_ingress_downloads_task_family           = "${var.project_name}-data-ingress-downloads${local.env_suffix}"
+  data_ingress_compustat_annual_task_family    = "${var.project_name}-data-ingress-compustat-annual${local.env_suffix}"
+  data_ingress_compustat_quarterly_task_family = "${var.project_name}-data-ingress-compustat-quarterly${local.env_suffix}"
+  data_ingress_refinitiv_task_family           = "${var.project_name}-data-ingress-refinitiv${local.env_suffix}"
+  data_ingress_predictors_task_family          = "${var.project_name}-data-ingress-predictors${local.env_suffix}"
   sfn_retry_ecs = [
     {
       ErrorEquals     = ["States.ALL"]
@@ -194,7 +194,7 @@ locals {
 
 # Step Functions State Machine
 resource "aws_sfn_state_machine" "pipeline" {
-  name     = "${var.project_name}-pipeline-${var.environment}"
+  name     = "${var.project_name}-pipeline${local.env_suffix}"
   role_arn = aws_iam_role.step_function.arn
 
   definition = jsonencode({

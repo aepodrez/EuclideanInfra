@@ -4,7 +4,7 @@ locals {
 
 resource "aws_iam_role" "firehose_to_s3" {
   count = var.enable_cloudwatch_logs_archive_to_s3 ? 1 : 0
-  name  = "${var.project_name}-firehose-cwlogs-${var.environment}"
+  name  = "${var.project_name}-firehose-cwlogs${local.env_suffix}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -24,7 +24,7 @@ resource "aws_iam_role" "firehose_to_s3" {
 
 resource "aws_iam_role_policy" "firehose_to_s3" {
   count = var.enable_cloudwatch_logs_archive_to_s3 ? 1 : 0
-  name  = "${var.project_name}-firehose-cwlogs-${var.environment}"
+  name  = "${var.project_name}-firehose-cwlogs${local.env_suffix}"
   role  = aws_iam_role.firehose_to_s3[0].id
 
   policy = jsonencode({
@@ -51,7 +51,7 @@ resource "aws_iam_role_policy" "firehose_to_s3" {
 
 resource "aws_kinesis_firehose_delivery_stream" "cloudwatch_to_s3" {
   count       = var.enable_cloudwatch_logs_archive_to_s3 ? 1 : 0
-  name        = "${var.project_name}-cwlogs-to-s3-${var.environment}"
+  name        = "${var.project_name}-cwlogs-to-s3${local.env_suffix}"
   destination = "extended_s3"
 
   extended_s3_configuration {
@@ -69,7 +69,7 @@ resource "aws_kinesis_firehose_delivery_stream" "cloudwatch_to_s3" {
 
 resource "aws_iam_role" "cloudwatch_logs_to_firehose" {
   count = var.enable_cloudwatch_logs_archive_to_s3 ? 1 : 0
-  name  = "${var.project_name}-cwlogs-to-firehose-${var.environment}"
+  name  = "${var.project_name}-cwlogs-to-firehose${local.env_suffix}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -92,7 +92,7 @@ resource "aws_iam_role" "cloudwatch_logs_to_firehose" {
 
 resource "aws_iam_role_policy" "cloudwatch_logs_to_firehose" {
   count = var.enable_cloudwatch_logs_archive_to_s3 ? 1 : 0
-  name  = "${var.project_name}-cwlogs-to-firehose-${var.environment}"
+  name  = "${var.project_name}-cwlogs-to-firehose${local.env_suffix}"
   role  = aws_iam_role.cloudwatch_logs_to_firehose[0].id
 
   policy = jsonencode({
@@ -116,7 +116,7 @@ resource "aws_iam_role_policy" "cloudwatch_logs_to_firehose" {
 
 resource "aws_cloudwatch_log_account_policy" "all_logs_to_firehose" {
   count       = var.enable_cloudwatch_logs_archive_to_s3 ? 1 : 0
-  policy_name = "${var.project_name}-cwlogs-to-s3-${var.environment}"
+  policy_name = "${var.project_name}-cwlogs-to-s3${local.env_suffix}"
   policy_type = "SUBSCRIPTION_FILTER_POLICY"
   scope       = "ALL"
 

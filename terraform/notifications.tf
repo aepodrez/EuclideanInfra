@@ -1,5 +1,5 @@
 resource "aws_sns_topic" "pipeline_notifications" {
-  name = "${var.project_name}-pipeline-notifications-${var.environment}"
+  name = "${var.project_name}-pipeline-notifications${local.env_suffix}"
 }
 
 resource "aws_sns_topic_policy" "pipeline_notifications" {
@@ -23,7 +23,7 @@ resource "aws_sns_topic_subscription" "sms" {
 }
 
 resource "aws_cloudwatch_event_rule" "pipeline_state_change" {
-  name        = "${var.project_name}-pipeline-state-change-${var.environment}"
+  name        = "${var.project_name}-pipeline-state-change${local.env_suffix}"
   description = "Fires on Step Functions pipeline SUCCEEDED, FAILED, TIMED_OUT, or ABORTED"
 
   event_pattern = jsonencode({

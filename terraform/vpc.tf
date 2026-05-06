@@ -6,7 +6,7 @@ resource "aws_vpc" "main" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-vpc-${var.environment}"
+      Name = "${var.project_name}-vpc${local.env_suffix}"
     },
   )
 }
@@ -18,7 +18,7 @@ resource "aws_internet_gateway" "main" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-igw-${var.environment}"
+      Name = "${var.project_name}-igw${local.env_suffix}"
     },
   )
 }
@@ -34,7 +34,7 @@ resource "aws_subnet" "public" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-public-subnet-${["a", "b"][count.index]}-${var.environment}"
+      Name = "${var.project_name}-public-subnet-${["a", "b"][count.index]}${local.env_suffix}"
       Type = "public"
     },
   )
@@ -50,7 +50,7 @@ resource "aws_subnet" "private" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-private-subnet-${["a", "b"][count.index]}-${var.environment}"
+      Name = "${var.project_name}-private-subnet-${["a", "b"][count.index]}${local.env_suffix}"
       Type = "private"
     },
   )
@@ -68,7 +68,7 @@ resource "aws_route_table" "public" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-public-rt-${var.environment}"
+      Name = "${var.project_name}-public-rt${local.env_suffix}"
     },
   )
 }
@@ -80,7 +80,7 @@ resource "aws_route_table" "private" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-private-rt-${var.environment}"
+      Name = "${var.project_name}-private-rt${local.env_suffix}"
     },
   )
 }
@@ -101,7 +101,7 @@ resource "aws_route_table_association" "private" {
 
 # Security Group for ECS Tasks
 resource "aws_security_group" "ecs" {
-  name        = "${var.project_name}-ecs-sg-${var.environment}"
+  name        = "${var.project_name}-ecs-sg${local.env_suffix}"
   description = "Security group for ECS tasks"
   vpc_id      = aws_vpc.main.id
 
@@ -116,7 +116,7 @@ resource "aws_security_group" "ecs" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-ecs-sg-${var.environment}"
+      Name = "${var.project_name}-ecs-sg${local.env_suffix}"
     },
   )
 }
@@ -134,7 +134,7 @@ resource "aws_vpc_endpoint" "s3" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.project_name}-s3-endpoint-${var.environment}"
+      Name = "${var.project_name}-s3-endpoint${local.env_suffix}"
     },
   )
 }

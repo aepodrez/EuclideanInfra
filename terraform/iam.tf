@@ -1,6 +1,6 @@
 # IAM role for Step Functions execution
 resource "aws_iam_role" "step_function" {
-  name = "${var.project_name}-sfn-role-${var.environment}"
+  name = "${var.project_name}-sfn-role${local.env_suffix}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -20,7 +20,7 @@ resource "aws_iam_role" "step_function" {
 
 # Inline policy for Step Functions to invoke Lambda and run ECS tasks
 resource "aws_iam_role_policy" "step_function" {
-  name = "${var.project_name}-sfn-policy-${var.environment}"
+  name = "${var.project_name}-sfn-policy${local.env_suffix}"
   role = aws_iam_role.step_function.id
 
   policy = jsonencode({
@@ -30,22 +30,22 @@ resource "aws_iam_role_policy" "step_function" {
         Effect = "Allow"
         Action = ["lambda:InvokeFunction"]
         Resource = [
-          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-universe-${var.environment}",
-          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model-${var.environment}",
-          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model-${var.environment}"
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-universe${local.env_suffix}",
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model${local.env_suffix}",
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model${local.env_suffix}"
         ]
       },
       {
         Effect = "Allow"
         Action = ["ecs:RunTask"]
         Resource = [
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-universe-${var.environment}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-downloads-${var.environment}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-compustat-annual-${var.environment}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-compustat-quarterly-${var.environment}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-refinitiv-${var.environment}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-predictors-${var.environment}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-portfolio-construction-${var.environment}:*"
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-universe${local.env_suffix}:*",
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-downloads${local.env_suffix}:*",
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-compustat-annual${local.env_suffix}:*",
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-compustat-quarterly${local.env_suffix}:*",
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-refinitiv${local.env_suffix}:*",
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-predictors${local.env_suffix}:*",
+          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-portfolio-construction${local.env_suffix}:*"
         ]
       },
       {
@@ -93,13 +93,13 @@ resource "aws_iam_role_policy" "step_function" {
 
 # CloudWatch Log Group for Step Functions
 resource "aws_cloudwatch_log_group" "step_function" {
-  name              = "/aws/stepfunctions/${var.project_name}-pipeline-${var.environment}"
+  name              = "/aws/stepfunctions/${var.project_name}-pipeline${local.env_suffix}"
   retention_in_days = 7
   tags              = local.common_tags
 }
 
 resource "aws_iam_policy" "operator_stepfunctions_read" {
-  name        = "${var.project_name}-operator-sfn-read-${var.environment}"
+  name        = "${var.project_name}-operator-sfn-read${local.env_suffix}"
   description = "Allow operator to list and inspect Step Functions executions for log export windows"
 
   policy = jsonencode({
@@ -127,7 +127,7 @@ resource "aws_iam_user_policy_attachment" "operator_stepfunctions_read" {
 
 # Allow github-cicd to pass any euclidean-* role to ECS when registering task definitions
 resource "aws_iam_user_policy" "github_cicd_ecs_pass_role" {
-  name = "${var.project_name}-github-cicd-ecs-pass-role-${var.environment}"
+  name = "${var.project_name}-github-cicd-ecs-pass-role${local.env_suffix}"
   user = var.github_cicd_iam_username
 
   policy = jsonencode({

@@ -19,6 +19,9 @@ data "aws_region" "current" {}
 
 # Common tags for all resources
 locals {
+  env_suffix = var.environment != "" ? "-${var.environment}" : ""
+  env_path   = var.environment != "" ? "/${var.environment}" : ""
+
   common_tags = {
     Project     = var.project_name
     Environment = var.environment
@@ -26,5 +29,5 @@ locals {
   }
 
   # S3 bucket name - auto-generate if not provided
-  s3_bucket_name = var.s3_bucket_name != "" ? var.s3_bucket_name : "${var.project_name}-pipeline-${var.environment}-${data.aws_caller_identity.current.account_id}"
+  s3_bucket_name = var.s3_bucket_name != "" ? var.s3_bucket_name : "${var.project_name}-pipeline${local.env_suffix}-${data.aws_caller_identity.current.account_id}"
 }

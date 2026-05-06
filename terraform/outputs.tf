@@ -61,49 +61,49 @@ output "cloudwatch_logs_account_policy_name" {
 
 # SSM Parameters for child infrastructure references
 resource "aws_ssm_parameter" "s3_bucket_name" {
-  name  = "/${var.project_name}/${var.environment}/s3_bucket_name"
+  name  = "/${var.project_name}${local.env_path}/s3_bucket_name"
   type  = "String"
   value = aws_s3_bucket.pipeline_data.id
   tags  = local.common_tags
 }
 
 resource "aws_ssm_parameter" "s3_bucket_arn" {
-  name  = "/${var.project_name}/${var.environment}/s3_bucket_arn"
+  name  = "/${var.project_name}${local.env_path}/s3_bucket_arn"
   type  = "String"
   value = aws_s3_bucket.pipeline_data.arn
   tags  = local.common_tags
 }
 
 resource "aws_ssm_parameter" "vpc_id" {
-  name  = "/${var.project_name}/${var.environment}/vpc_id"
+  name  = "/${var.project_name}${local.env_path}/vpc_id"
   type  = "String"
   value = aws_vpc.main.id
   tags  = local.common_tags
 }
 
 resource "aws_ssm_parameter" "private_subnet_ids" {
-  name  = "/${var.project_name}/${var.environment}/private_subnet_ids"
+  name  = "/${var.project_name}${local.env_path}/private_subnet_ids"
   type  = "String"
   value = join(",", aws_subnet.private[*].id)
   tags  = local.common_tags
 }
 
 resource "aws_ssm_parameter" "public_subnet_ids" {
-  name  = "/${var.project_name}/${var.environment}/public_subnet_ids"
+  name  = "/${var.project_name}${local.env_path}/public_subnet_ids"
   type  = "String"
   value = join(",", aws_subnet.public[*].id)
   tags  = local.common_tags
 }
 
 resource "aws_ssm_parameter" "ecs_cluster_arn" {
-  name  = "/${var.project_name}/${var.environment}/ecs_cluster_arn"
+  name  = "/${var.project_name}${local.env_path}/ecs_cluster_arn"
   type  = "String"
   value = aws_ecs_cluster.main.arn
   tags  = local.common_tags
 }
 
 resource "aws_ssm_parameter" "ecs_security_group_id" {
-  name  = "/${var.project_name}/${var.environment}/ecs_security_group_id"
+  name  = "/${var.project_name}${local.env_path}/ecs_security_group_id"
   type  = "String"
   value = aws_security_group.ecs.id
   tags  = local.common_tags
