@@ -63,3 +63,9 @@ variable "github_cicd_iam_username" {
   type        = string
   default     = "github-cicd"
 }
+
+variable "notification_phone_number" {
+  description = "E.164 phone number for pipeline SMS alerts (e.g. +15551234567)"
+  type        = string
+  sensitive   = true
+}
