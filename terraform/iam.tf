@@ -125,6 +125,30 @@ resource "aws_iam_user_policy_attachment" "operator_stepfunctions_read" {
   policy_arn = aws_iam_policy.operator_stepfunctions_read.arn
 }
 
+# Allow github-cicd to update Lambda function code for alpha-model and execution-model
+resource "aws_iam_user_policy" "github_cicd_lambda_deploy" {
+  name = "${var.project_name}-github-cicd-lambda-deploy${local.env_suffix}"
+  user = var.github_cicd_iam_username
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:UpdateFunctionCode",
+          "lambda:GetFunction",
+          "lambda:GetFunctionConfiguration"
+        ]
+        Resource = [
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model${local.env_suffix}",
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model${local.env_suffix}"
+        ]
+      }
+    ]
+  })
+}
+
 # Allow github-cicd to pass any euclidean-* role to ECS when registering task definitions
 resource "aws_iam_user_policy" "github_cicd_ecs_pass_role" {
   name = "${var.project_name}-github-cicd-ecs-pass-role${local.env_suffix}"
