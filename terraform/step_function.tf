@@ -972,29 +972,76 @@ resource "aws_sfn_state_machine" "pipeline" {
         }
         Retry      = local.sfn_retry_ecs
         ResultPath = "$.portfolio_result"
-        Next       = "RunExecutionModel"
+        Next       = "RunExecutionPhase1"
       }
-      RunExecutionModel = {
+      # Phase 1: submit sell-side orders as MOO (after EOD)
+      RunExecutionPhase1 = {
         Type     = "Task"
         Resource = "arn:aws:states:::lambda:invoke"
         Parameters = {
           FunctionName = local.execution_model_lambda_arn
           Payload = {
-            s3_prefix                  = "execution-model"
             "portfolio_weights_path.$" = "$.portfolio_result.s3_output_path"
-            output_key                 = "execution-model/execution_report.json"
+            output_key                 = "execution-model/execution_report_close.json"
+            side                       = "close"
             dry_run                    = false
             "execution_id.$"           = "$$.Execution.Id"
           }
         }
         ResultSelector = {
           "statusCode.$"       = "$.Payload.statusCode"
-          "s3_output_path.$"   = "$.Payload.s3_output_path"
           "execution_status.$" = "$.Payload.execution_status"
-          "dry_run.$"          = "$.Payload.dry_run"
+          "next_market_open.$" = "$.Payload.next_market_open"
         }
         Retry      = local.sfn_retry_lambda
-        ResultPath = "$.execution_result"
+        ResultPath = "$.phase1_result"
+        Next       = "CheckPhase1Result"
+      }
+      CheckPhase1Result = {
+        Type = "Choice"
+        Choices = [
+          {
+            And = [
+              {
+                Variable      = "$.phase1_result.statusCode"
+                NumericEquals = 200
+              },
+              {
+                Variable     = "$.phase1_result.execution_status"
+                StringEquals = "ok"
+              }
+            ]
+            Next = "WaitForMarketOpen"
+          }
+        ]
+        Default = "ExecutionPhase1Failed"
+      }
+      # Wait until next market open (timestamp returned by phase 1 from Alpaca clock)
+      WaitForMarketOpen = {
+        Type          = "Wait"
+        TimestampPath = "$.phase1_result.next_market_open"
+        Next          = "RunExecutionPhase2"
+      }
+      # Phase 2: submit buy-side orders as day orders (at market open)
+      RunExecutionPhase2 = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::lambda:invoke"
+        Parameters = {
+          FunctionName = local.execution_model_lambda_arn
+          Payload = {
+            "portfolio_weights_path.$" = "$.portfolio_result.s3_output_path"
+            output_key                 = "execution-model/execution_report_open.json"
+            side                       = "open"
+            dry_run                    = false
+            "execution_id.$"           = "$$.Execution.Id"
+          }
+        }
+        ResultSelector = {
+          "statusCode.$"       = "$.Payload.statusCode"
+          "execution_status.$" = "$.Payload.execution_status"
+        }
+        Retry      = local.sfn_retry_lambda
+        ResultPath = "$.phase2_result"
         Next       = "CheckExecutionModelResult"
       }
       CheckExecutionModelResult = {
@@ -1003,11 +1050,11 @@ resource "aws_sfn_state_machine" "pipeline" {
           {
             And = [
               {
-                Variable      = "$.execution_result.statusCode"
+                Variable      = "$.phase2_result.statusCode"
                 NumericEquals = 200
               },
               {
-                Variable     = "$.execution_result.execution_status"
+                Variable     = "$.phase2_result.execution_status"
                 StringEquals = "ok"
               }
             ]
@@ -1019,10 +1066,15 @@ resource "aws_sfn_state_machine" "pipeline" {
       ExecutionSucceeded = {
         Type = "Succeed"
       }
+      ExecutionPhase1Failed = {
+        Type  = "Fail"
+        Error = "ExecutionPhase1Failed"
+        Cause = "Execution model phase 1 (close/sell) reported an error."
+      }
       ExecutionModelFailed = {
         Type  = "Fail"
         Error = "ExecutionModelFailed"
-        Cause = "Execution model reported an error."
+        Cause = "Execution model phase 2 (open/buy) reported an error."
       }
     }
   })
