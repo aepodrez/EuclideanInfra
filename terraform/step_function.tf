@@ -849,7 +849,265 @@ resource "aws_sfn_state_machine" "pipeline" {
               }
             }
           },
-          # Branch 14: Fama-French (BuildFFPortfolios must precede daily then monthly)
+          # Branch 14: BaliHovak implied volatility (Yahoo Finance options, incremental snapshots)
+          {
+            StartAt = "RunBaliHovak"
+            States = {
+              RunBaliHovak = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunBaliHovak" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/BaliHovak.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\",\"pyData/OptionSnapshots/\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/bali_hovak_imp_vol.parquet\",\"pyData/OptionSnapshots/\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/bali_hovak_imp_vol.parquet\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
+                End            = true
+              }
+            }
+          },
+          # Branch 15: OptionMetricsVolume (Yahoo Finance options, incremental snapshots)
+          {
+            StartAt = "RunOptionMetricsVolume"
+            States = {
+              RunOptionMetricsVolume = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunOptionMetricsVolume" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/OptionMetricsVolume.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\",\"pyData/OptionSnapshots/\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/OptionMetricsVolume.parquet\",\"pyData/OptionSnapshots/\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/OptionMetricsVolume.parquet\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
+                End            = true
+              }
+            }
+          },
+          # Branch 16: OptionMetricsXZZ (Yahoo Finance options, incremental snapshots)
+          {
+            StartAt = "RunOptionMetricsXZZ"
+            States = {
+              RunOptionMetricsXZZ = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunOptionMetricsXZZ" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/OptionMetricsXZZ.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\",\"pyData/OptionSnapshots/\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/OptionMetricsXZZ.parquet\",\"pyData/OptionSnapshots/\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/OptionMetricsXZZ.parquet\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
+                End            = true
+              }
+            }
+          },
+          # Branch 17: CorwinSchultz bid-ask spread (Yahoo Finance OHLC)
+          {
+            StartAt = "RunCorwinSchultz"
+            States = {
+              RunCorwinSchultz = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunCorwinSchultz" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CorwinSchultz.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/corwin_schultz_spread.parquet\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/corwin_schultz_spread.parquet\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
+                End            = true
+              }
+            }
+          },
+          # Branch 18: CompustatBusinessSegments (SEC EDGAR XBRL)
+          {
+            StartAt = "RunCompustatBusinessSegments"
+            States = {
+              RunCompustatBusinessSegments = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunCompustatBusinessSegments" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CompustatBusinessSegments.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/CompustatSegments.parquet\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/CompustatSegments.parquet\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
+                End            = true
+              }
+            }
+          },
+          # Branch 19: CompustatCustomerSegments (SEC EDGAR XBRL)
+          {
+            StartAt = "RunCompustatCustomerSegments"
+            States = {
+              RunCompustatCustomerSegments = {
+                Type     = "Task"
+                Resource = "arn:aws:states:::ecs:runTask.sync"
+                Parameters = {
+                  LaunchType     = "FARGATE"
+                  Cluster        = aws_ecs_cluster.main.arn
+                  TaskDefinition = local.data_ingress_downloads_task_family
+                  NetworkConfiguration = {
+                    AwsvpcConfiguration = {
+                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
+                      SecurityGroups = [aws_security_group.ecs.id]
+                      AssignPublicIp = "ENABLED"
+                    }
+                  }
+                  Overrides = {
+                    ContainerOverrides = [
+                      {
+                        Name = "crosssection-data"
+                        Environment = [
+                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
+                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
+                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunCompustatCustomerSegments" },
+                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CompustatCustomerSegments.py" },
+                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[]" },
+                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
+                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[]" },
+                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/CompustatSegmentDataCustomers.csv\"]" },
+                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/CompustatSegmentDataCustomers.csv\"]" },
+                        ]
+                      }
+                    ]
+                  }
+                }
+                ResultSelector = { statusCode = 200 }
+                Retry          = local.sfn_retry_ecs
+                End            = true
+              }
+            }
+          },
+          # Branch 20: Fama-French (BuildFFPortfolios must precede daily then monthly)
           {
             StartAt = "RunBuildFFPortfolios"
             States = {
