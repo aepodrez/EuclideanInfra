@@ -70,3 +70,10 @@ variable "notification_phone_number" {
   sensitive   = true
   default     = ""
 }
+
+variable "edgar_identity" {
+  description = "EDGAR User-Agent identity string for SEC requests (e.g. 'Org Name contact@example.com')"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

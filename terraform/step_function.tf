@@ -82,6 +82,23 @@ resource "aws_sfn_state_machine" "pipeline" {
         }
         Retry      = local.sfn_retry_ecs
         ResultPath = "$.universe_result"
+        Next       = "CheckCompustatFreshness"
+      }
+      CheckCompustatFreshness = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::lambda:invoke"
+        Parameters = {
+          FunctionName = local.compustat_preflight_lambda_arn
+          Payload      = {}
+        }
+        ResultSelector = {
+          "annual_has_new.$"    = "$.Payload.annual_has_new"
+          "quarterly_has_new.$" = "$.Payload.quarterly_has_new"
+          "last_run_at.$"       = "$.Payload.last_run_at"
+          "reason.$"            = "$.Payload.reason"
+        }
+        ResultPath = "$.compustat_preflight"
+        Retry      = local.sfn_retry_lambda
         Next       = "RunDataIngressJobGraph"
       }
       RunDataIngressJobGraph = {
@@ -503,10 +520,24 @@ resource "aws_sfn_state_machine" "pipeline" {
               }
             }
           },
-          # Branch 6: CompustatAnnual (dedicated task family — larger instance)
+          # Branch 6: CompustatAnnual (dedicated task family — gated by preflight)
           {
-            StartAt = "RunCompustatAnnual"
+            StartAt = "MaybeRunCompustatAnnual"
             States = {
+              MaybeRunCompustatAnnual = {
+                Type = "Choice"
+                Choices = [{
+                  Variable      = "$.compustat_preflight.annual_has_new"
+                  BooleanEquals = true
+                  Next          = "RunCompustatAnnual"
+                }]
+                Default = "SkipCompustatAnnual"
+              }
+              SkipCompustatAnnual = {
+                Type   = "Pass"
+                Result = { statusCode = 200, skipped = true, reason = "no_new_10K_filings" }
+                End    = true
+              }
               RunCompustatAnnual = {
                 Type     = "Task"
                 Resource = "arn:aws:states:::ecs:runTask.sync"
@@ -546,10 +577,24 @@ resource "aws_sfn_state_machine" "pipeline" {
               }
             }
           },
-          # Branch 7: CompustatQuarterly (dedicated task family — larger instance)
+          # Branch 7: CompustatQuarterly (dedicated task family — gated by preflight)
           {
-            StartAt = "RunCompustatQuarterly"
+            StartAt = "MaybeRunCompustatQuarterly"
             States = {
+              MaybeRunCompustatQuarterly = {
+                Type = "Choice"
+                Choices = [{
+                  Variable      = "$.compustat_preflight.quarterly_has_new"
+                  BooleanEquals = true
+                  Next          = "RunCompustatQuarterly"
+                }]
+                Default = "SkipCompustatQuarterly"
+              }
+              SkipCompustatQuarterly = {
+                Type   = "Pass"
+                Result = { statusCode = 200, skipped = true, reason = "no_new_10Q_filings" }
+                End    = true
+              }
               RunCompustatQuarterly = {
                 Type     = "Task"
                 Resource = "arn:aws:states:::ecs:runTask.sync"
