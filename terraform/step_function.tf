@@ -143,7 +143,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCRSPMonthlyFailed", ResultPath = "$.error" }]
                 Next           = "PostCRSPParallel"
+              }
+              RunCRSPMonthlyFailed = {
+                Type = "Pass"
+                End  = true
               }
               PostCRSPParallel = {
                 Type = "Parallel"
@@ -186,7 +191,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                         }
                         ResultSelector = { statusCode = 200 }
                         Retry          = local.sfn_retry_ecs
+                        Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCRSPAcquisitionsFailed", ResultPath = "$.error" }]
                         End            = true
+                      }
+                      RunCRSPAcquisitionsFailed = {
+                        Type = "Pass"
+                        End  = true
                       }
                     }
                   },
@@ -228,7 +238,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                         }
                         ResultSelector = { statusCode = 200 }
                         Retry          = local.sfn_retry_ecs
+                        Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunIPODatesFailed", ResultPath = "$.error" }]
                         End            = true
+                      }
+                      RunIPODatesFailed = {
+                        Type = "Pass"
+                        End  = true
                       }
                     }
                   }
@@ -276,7 +291,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunIBESEPSAdjustedFailed", ResultPath = "$.error" }]
                 Next           = "RunIBESEPSUnadjusted"
+              }
+              RunIBESEPSAdjustedFailed = {
+                Type = "Pass"
+                End  = true
               }
               RunIBESEPSUnadjusted = {
                 Type     = "Task"
@@ -313,7 +333,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunIBESEPSUnadjustedFailed", ResultPath = "$.error" }]
                 Next           = "RunIBESUnadjustedActuals"
+              }
+              RunIBESEPSUnadjustedFailed = {
+                Type = "Pass"
+                End  = true
               }
               RunIBESUnadjustedActuals = {
                 Type     = "Task"
@@ -350,7 +375,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunIBESUnadjustedActualsFailed", ResultPath = "$.error" }]
                 Next           = "RunIBESRecommendations"
+              }
+              RunIBESUnadjustedActualsFailed = {
+                Type = "Pass"
+                End  = true
               }
               RunIBESRecommendations = {
                 Type     = "Task"
@@ -387,7 +417,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunIBESRecommendationsFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunIBESRecommendationsFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -430,7 +465,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCRSPDailyFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunCRSPDailyFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -473,7 +513,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCRSPDistributionsFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunCRSPDistributionsFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -516,7 +561,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunBEAInputOutputFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunBEAInputOutputFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -573,7 +623,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCompustatAnnualFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunCompustatAnnualFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -630,7 +685,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCompustatQuarterlyFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunCompustatQuarterlyFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -673,7 +733,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunGNPDeflatorFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunGNPDeflatorFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -718,7 +783,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunInstitutionalHoldings13FFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunInstitutionalHoldings13FFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -761,7 +831,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunMarketReturnsFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunMarketReturnsFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -804,7 +879,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunQFactorModelFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunQFactorModelFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -847,7 +927,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunTreasuryBill3MFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunTreasuryBill3MFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -890,7 +975,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunVIXFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunVIXFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -933,7 +1023,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunBaliHovakFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunBaliHovakFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -976,7 +1071,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunOptionMetricsVolumeFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunOptionMetricsVolumeFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -1019,7 +1119,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunOptionMetricsXZZFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunOptionMetricsXZZFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -1062,7 +1167,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCorwinSchultzFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunCorwinSchultzFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -1105,7 +1215,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCompustatBusinessSegmentsFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunCompustatBusinessSegmentsFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -1148,7 +1263,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCompustatCustomerSegmentsFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunCompustatCustomerSegmentsFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -1191,7 +1311,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunBuildFFPortfoliosFailed", ResultPath = "$.error" }]
                 Next           = "RunFamaFrenchDaily"
+              }
+              RunBuildFFPortfoliosFailed = {
+                Type = "Pass"
+                End  = true
               }
               RunFamaFrenchDaily = {
                 Type     = "Task"
@@ -1228,7 +1353,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunFamaFrenchDailyFailed", ResultPath = "$.error" }]
                 Next           = "RunFamaFrenchMonthly"
+              }
+              RunFamaFrenchDailyFailed = {
+                Type = "Pass"
+                End  = true
               }
               RunFamaFrenchMonthly = {
                 Type     = "Task"
@@ -1265,7 +1395,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunFamaFrenchMonthlyFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunFamaFrenchMonthlyFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           }
@@ -1316,7 +1451,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCompustatShortInterestFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunCompustatShortInterestFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -1359,7 +1499,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunIBESCRSPLinkFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunIBESCRSPLinkFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           },
@@ -1404,7 +1549,12 @@ resource "aws_sfn_state_machine" "pipeline" {
                 }
                 ResultSelector = { statusCode = 200 }
                 Retry          = local.sfn_retry_ecs
+                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunUSASpendingFailed", ResultPath = "$.error" }]
                 End            = true
+              }
+              RunUSASpendingFailed = {
+                Type = "Pass"
+                End  = true
               }
             }
           }
