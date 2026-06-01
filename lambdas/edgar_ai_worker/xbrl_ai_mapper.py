@@ -260,7 +260,7 @@ JSON mapping:"""
 # ---------------------------------------------------------------------------
 # Bedrock invocation
 # ---------------------------------------------------------------------------
-_BEDROCK_MODEL = "us.meta.llama3-3-70b-instruct-v1:0"
+_BEDROCK_MODEL = "us.deepseek.r1-v1:0"
 
 
 def invoke_bedrock(prompt: str, bedrock_client) -> dict[str, Optional[str]]:

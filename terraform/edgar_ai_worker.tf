@@ -58,7 +58,7 @@ resource "aws_iam_role_policy" "edgar_ai_worker" {
         Effect = "Allow"
         Action = ["bedrock:InvokeModel"]
         Resource = [
-          "arn:aws:bedrock:${data.aws_region.current.name}::foundation-model/us.meta.llama3-3-70b-instruct-v1:0"
+          "arn:aws:bedrock:${data.aws_region.current.name}::foundation-model/us.deepseek.r1-v1:0"
         ]
       },
       {
