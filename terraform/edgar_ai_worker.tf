@@ -84,7 +84,7 @@ resource "aws_lambda_function" "edgar_ai_worker" {
   filename         = data.archive_file.edgar_ai_worker.output_path
   source_code_hash = data.archive_file.edgar_ai_worker.output_base64sha256
   memory_size      = 1536
-  timeout          = 300
+  timeout          = 900
 
   layers = [local.aws_sdk_pandas_layer_arn]
 

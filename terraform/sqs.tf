@@ -11,7 +11,7 @@ resource "aws_sqs_queue" "edgar_filings_dlq" {
 
 resource "aws_sqs_queue" "edgar_filings" {
   name                       = local.edgar_filings_queue_name
-  visibility_timeout_seconds = 360 # must be >= Lambda timeout (300s) + buffer
+  visibility_timeout_seconds = 960 # must be >= Lambda timeout (900s) + buffer
   message_retention_seconds  = 86400
   receive_wait_time_seconds  = 20 # long polling
 
