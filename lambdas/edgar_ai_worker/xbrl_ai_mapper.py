@@ -57,7 +57,9 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "re":   "Retained Earnings (Accumulated Deficit)",
     "mib":  "Minority / Noncontrolling Interest (balance sheet carrying value)",
     # Income Statement
-    "sale":   "Net Revenue / Net Sales (operating revenue only; for banks use total interest + noninterest income)",
+    "sale":          "Net Revenue / Net Sales (operating revenue only; for banks use total interest + noninterest income)",
+    "revt_interest": "Interest Income — bank total interest and fee income on loans/securities (banks only)",
+    "revt_noninterest": "Non-Interest Income — bank fees, trading gains, service charges (banks only)",
     "cogs":   "Cost of Goods Sold / Cost of Revenue",
     "gp":     "Gross Profit",
     "xsga":   "Selling General & Administrative Expense",
@@ -89,10 +91,13 @@ COMPUSTAT_FIELDS: dict[str, str] = {
 # Accounting identities shown to the LLM as reasoning constraints
 IDENTITY_PROMPT = """
 Accounting identities to guide your tag selection (all values in same currency units):
-  1. at = lt + seq               (Total Assets = Total Liabilities + Total Equity)
-  2. gp = sale - cogs            (Gross Profit = Revenue - Cost of Revenue)
-  3. ib ≈ pi - txt - mib_ni     (Net Income ≈ Pre-tax Income - Tax - Minority NCI income)
+  1. at = lt + seq                              (Total Assets = Total Liabilities + Total Equity)
+  2. gp = sale - cogs                           (Gross Profit = Revenue - Cost of Revenue)
+  3. ib ≈ pi - txt - mib_ni                    (Net Income ≈ Pre-tax Income - Tax - NCI income)
   4. oancf + ivncf + fincf + exre ≈ change in cash balance (Cash Flow Statement)
+  5. seq = ceq + pstk + mib                    (Total Equity = Common + Preferred + NCI book value)
+  6. ni = ib - mib_ni                          (Parent Net Income = Total NI - NCI income)
+  7. sale = revt_interest + revt_noninterest   (Bank Total Revenue; banks only)
 
 Use these as sanity checks: if your chosen tags violate an identity badly, reconsider.
 """
@@ -167,29 +172,54 @@ def fetch_filing_metadata(cik: str, accession: str) -> dict:
     raise ValueError(f"Accession {accession} not found in submissions for CIK {cik}")
 
 
-def fetch_xbrl_facts(cik: str, accession: str) -> dict[str, float]:
-    """Returns {us-gaap concept: value} for all monetary USD facts in this filing."""
+def fetch_xbrl_facts(cik: str, accession: str, form_type: str = "") -> dict[str, float]:
+    """Returns {us-gaap concept: value} for all monetary USD facts in this filing.
+
+    For 10-Q filings, duration-based facts (income statement, cash flow) prefer
+    the longest-period entry (YTD cumulative) over shorter QTD-only entries.
+    """
+    from datetime import date as _date
+
     cik_padded = str(int(cik)).zfill(10)
     url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_padded}.json"
     data = _http_get_json(url)
 
     accession_norm = accession.replace("-", "")
-    facts: dict[str, float] = {}
+    is_quarterly = form_type.upper().startswith("10-Q")
+
+    # For each concept, track (value, duration_days) — pick the longest-duration match
+    best: dict[str, tuple[float, int]] = {}
     us_gaap = data.get("facts", {}).get("us-gaap", {})
 
     for concept, info in us_gaap.items():
         usd_entries = info.get("units", {}).get("USD", [])
         for entry in usd_entries:
-            if entry.get("accn", "").replace("-", "") == accession_norm:
-                # Prefer FY/annual facts; for the same concept take the one with
-                # the longest period (largest val is a heuristic for annual vs. quarterly)
-                val = entry.get("val")
-                if val is not None:
-                    # Keep the first match; annual filings have fp="FY"
-                    fp = entry.get("fp", "")
-                    if concept not in facts or fp == "FY":
-                        facts[concept] = float(val)
+            if entry.get("accn", "").replace("-", "") != accession_norm:
+                continue
+            val = entry.get("val")
+            if val is None:
+                continue
+            val = float(val)
 
+            start = entry.get("start", "")
+            end_str = entry.get("end", "")
+
+            if is_quarterly and start and end_str:
+                # Duration fact: compute period length to prefer YTD over QTD
+                try:
+                    duration = (_date.fromisoformat(end_str) - _date.fromisoformat(start)).days
+                except Exception:
+                    duration = 0
+            else:
+                # Instant fact (balance sheet) or annual filing: fp=FY wins
+                fp = entry.get("fp", "")
+                duration = 9999 if fp == "FY" else 1
+
+            existing = best.get(concept)
+            if existing is None or duration > existing[1]:
+                best[concept] = (val, duration)
+
+    facts = {concept: val for concept, (val, _) in best.items()}
     log.info("Fetched %d XBRL facts for accession %s", len(facts), accession)
     return facts
 
@@ -325,6 +355,12 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL") -> dic
     seq = values.get("seq", 0.0)
     _check("BalanceSheet", at, lt + seq)
 
+    # --- Equity decomposition: seq = ceq + pstk + mib (all industries) ---
+    ceq  = values.get("ceq",  0.0)
+    pstk = values.get("pstk", 0.0)
+    mib  = values.get("mib",  0.0)
+    _check("Equity_decomposition", seq, ceq + pstk + mib)
+
     # --- Liabilities = Current + Noncurrent (not BANK/INSURANCE/FINANCIAL) ---
     if industry not in ("BANK", "INSURANCE", "FINANCIAL"):
         lct          = values.get("lct",          0.0)
@@ -367,6 +403,10 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL") -> dic
     ib     = values.get("ib",     0.0)
     _check("NetIncome", ib, pi - txt - mib_ni)
 
+    # --- Net Income attribution: ni = ib - mib_ni (all industries) ---
+    ni = values.get("ni", 0.0)
+    _check("NetIncome_attribution", ni, ib - mib_ni)
+
     # --- Cash Flow total (reported as sum, not residual) ---
     oancf = values.get("oancf", 0.0)
     ivncf = values.get("ivncf", 0.0)
@@ -375,14 +415,15 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL") -> dic
     if oancf or ivncf or fincf:
         residuals["CashFlow_componentSum"] = oancf + ivncf + fincf + exre
 
-    # --- Bank: Net Interest Income = Interest Income - Interest Expense ---
+    # --- Bank: revenue identities ---
     if industry == "BANK":
-        revt_interest = values.get("revt_interest", 0.0)
-        xint          = values.get("xint",          0.0)
-        # We don't have a direct net interest income field to validate against,
-        # so record the computed net as a diagnostic
+        revt_interest    = values.get("revt_interest",    0.0)
+        revt_noninterest = values.get("revt_noninterest", 0.0)
+        xint             = values.get("xint",             0.0)
+        sale_v           = values.get("sale",             0.0)
         if revt_interest or xint:
             residuals["Bank_NetInterestIncome"] = revt_interest - xint
+        _check("Bank_Revenue_partition", sale_v, revt_interest + revt_noninterest)
 
     # --- Insurance: Net Premiums = Direct + Assumed - Ceded ---
     if industry == "INSURANCE":
@@ -422,7 +463,7 @@ def map_filing(
     log.info("report_date=%s", report_date)
 
     # 2. XBRL facts
-    facts = fetch_xbrl_facts(cik_padded, accession)
+    facts = fetch_xbrl_facts(cik_padded, accession, form_type)
     if not facts:
         raise RuntimeError(f"No XBRL facts found for {cik} / {accession}")
 
