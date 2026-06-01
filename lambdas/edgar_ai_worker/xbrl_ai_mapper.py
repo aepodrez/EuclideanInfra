@@ -213,9 +213,13 @@ def fetch_xbrl_facts(cik: str, accession: str, form_type: str = "") -> dict[str,
                 except Exception:
                     duration = 9999
             else:
-                # Instant fact (balance sheet) or annual filing: fp=FY wins
-                fp = entry.get("fp", "")
-                duration = 0 if fp == "FY" else 9999
+                # Instant fact (balance sheet): prefer the LATEST end date
+                # (current-quarter balance sheet, not comparative prior-period).
+                # Negative ordinal ensures more-recent dates sort as "shorter".
+                try:
+                    duration = -_date.fromisoformat(end_str).toordinal() if end_str else 0
+                except Exception:
+                    duration = 0
 
             existing = best.get(concept)
             if existing is None or duration < existing[1]:
