@@ -39,7 +39,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "gdwl":      "Goodwill",
     "ivao":      "Long-term Investments / Noncurrent Investments",
     # Balance Sheet — Liabilities
-    "lt":            "Total Liabilities",
+    "lt":            "Total Liabilities — use the Liabilities concept. Do NOT use LiabilitiesAndStockholdersEquity (that is total assets, not liabilities alone). Leave null if no standalone Liabilities tag is present",
     "lct":           "Total Current Liabilities",
     "lt_noncurrent": "Total Noncurrent Liabilities",
     "dlc":           "Short-term Debt (current maturities of LT debt + short-term borrowings)",
@@ -341,6 +341,13 @@ def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str]]) -
         if tag and tag in facts:
             values[field] = facts[tag]
 
+    # Derive lt = at - seq when Liabilities is not directly tagged in XBRL.
+    if "lt" not in values:
+        at  = values.get("at",  0.0)
+        seq = values.get("seq", 0.0)
+        if at and seq:
+            values["lt"] = at - seq
+
     # Derive lt_noncurrent = lt - lct if AI didn't assign it directly.
     # Most companies don't tag a total noncurrent liabilities line in XBRL.
     if "lt_noncurrent" not in values:
@@ -348,6 +355,12 @@ def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str]]) -
         lct = values.get("lct", 0.0)
         if lt and lct:
             values["lt_noncurrent"] = lt - lct
+
+    # Derive ceq = seq - pstk for companies with preferred stock where the AI
+    # mapped ceq and seq to the same tag (seq already includes preferred).
+    if "ceq" in values and "pstk" in values and "seq" in values:
+        if values.get("ceq") == values.get("seq") and values.get("pstk", 0.0) != 0.0:
+            values["ceq"] = values["seq"] - values["pstk"]
 
     return values
 
@@ -420,9 +433,13 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL") -> dic
     ib     = values.get("ib",     0.0)
     _check("NetIncome", ib, pi - txt - mib_ni)
 
-    # --- Net Income attribution: ni = ib - mib_ni (all industries) ---
-    ni = values.get("ni", 0.0)
-    _check("NetIncome_attribution", ni, ib - mib_ni)
+    # --- Net Income attribution: ni = ib - mib_ni - preferred dividends ---
+    # For companies with preferred stock, ni (available to common) may differ
+    # from ib by preferred dividends in addition to minority interest.
+    # dvp captures preferred dividends paid; use it when available.
+    ni  = values.get("ni",  0.0)
+    dvp = values.get("dvp", 0.0)
+    _check("NetIncome_attribution", ni, ib - mib_ni - dvp)
 
     # --- Cash Flow total (reported as sum, not residual) ---
     oancf = values.get("oancf", 0.0)
