@@ -33,7 +33,6 @@ resource "aws_iam_role_policy" "step_function" {
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-universe${local.env_suffix}",
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model${local.env_suffix}",
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model${local.env_suffix}",
-          local.compustat_preflight_lambda_arn,
         ]
       },
       {
@@ -42,8 +41,6 @@ resource "aws_iam_role_policy" "step_function" {
         Resource = [
           "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-universe${local.env_suffix}:*",
           "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-downloads${local.env_suffix}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-compustat-annual${local.env_suffix}:*",
-          "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-compustat-quarterly${local.env_suffix}:*",
           "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-refinitiv${local.env_suffix}:*",
           "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-data-ingress-predictors${local.env_suffix}:*",
           "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project_name}-portfolio-construction${local.env_suffix}:*"

@@ -5,8 +5,6 @@ locals {
   portfolio_construction_task_family           = "${var.project_name}-portfolio-construction${local.env_suffix}"
   execution_model_lambda_arn                   = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model${local.env_suffix}"
   data_ingress_downloads_task_family           = "${var.project_name}-data-ingress-downloads${local.env_suffix}"
-  data_ingress_compustat_annual_task_family    = "${var.project_name}-data-ingress-compustat-annual${local.env_suffix}"
-  data_ingress_compustat_quarterly_task_family = "${var.project_name}-data-ingress-compustat-quarterly${local.env_suffix}"
   data_ingress_refinitiv_task_family           = "${var.project_name}-data-ingress-refinitiv${local.env_suffix}"
   data_ingress_predictors_task_family          = "${var.project_name}-data-ingress-predictors${local.env_suffix}"
   sfn_retry_ecs = [
@@ -82,23 +80,6 @@ resource "aws_sfn_state_machine" "pipeline" {
         }
         Retry      = local.sfn_retry_ecs
         ResultPath = "$.universe_result"
-        Next       = "CheckCompustatFreshness"
-      }
-      CheckCompustatFreshness = {
-        Type     = "Task"
-        Resource = "arn:aws:states:::lambda:invoke"
-        Parameters = {
-          FunctionName = local.compustat_preflight_lambda_arn
-          Payload      = {}
-        }
-        ResultSelector = {
-          "annual_has_new.$"    = "$.Payload.annual_has_new"
-          "quarterly_has_new.$" = "$.Payload.quarterly_has_new"
-          "last_run_at.$"       = "$.Payload.last_run_at"
-          "reason.$"            = "$.Payload.reason"
-        }
-        ResultPath = "$.compustat_preflight"
-        Retry      = local.sfn_retry_lambda
         Next       = "RunDataIngressJobGraph"
       }
       RunDataIngressJobGraph = {
@@ -570,131 +551,7 @@ resource "aws_sfn_state_machine" "pipeline" {
               }
             }
           },
-          # Branch 6: CompustatAnnual (dedicated task family — gated by preflight)
-          {
-            StartAt = "MaybeRunCompustatAnnual"
-            States = {
-              MaybeRunCompustatAnnual = {
-                Type = "Choice"
-                Choices = [{
-                  Variable      = "$.compustat_preflight.annual_has_new"
-                  BooleanEquals = true
-                  Next          = "RunCompustatAnnual"
-                }]
-                Default = "SkipCompustatAnnual"
-              }
-              SkipCompustatAnnual = {
-                Type   = "Pass"
-                Result = { statusCode = 200, skipped = true, reason = "no_new_10K_filings" }
-                End    = true
-              }
-              RunCompustatAnnual = {
-                Type     = "Task"
-                Resource = "arn:aws:states:::ecs:runTask.sync"
-                Parameters = {
-                  LaunchType     = "FARGATE"
-                  Cluster        = aws_ecs_cluster.main.arn
-                  TaskDefinition = local.data_ingress_compustat_annual_task_family
-                  NetworkConfiguration = {
-                    AwsvpcConfiguration = {
-                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
-                      SecurityGroups = [aws_security_group.ecs.id]
-                      AssignPublicIp = "ENABLED"
-                    }
-                  }
-                  Overrides = {
-                    ContainerOverrides = [
-                      {
-                        Name = "crosssection-data"
-                        Environment = [
-                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
-                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
-                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunCompustatAnnual" },
-                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CompustatAnnual.py" },
-                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[\"--universe_csv\",\"../Static/universe.csv\",\"--output_dir\",\"../pyData/Intermediate/compustat_annual\"]" },
-                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
-                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"Static/universe.csv\"]" },
-                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/compustat_annual/outputs/features.parquet\",\"pyData/Intermediate/compustat_annual/outputs/features.csv\",\"pyData/Intermediate/compustat_annual/outputs/diagnostics_anchor_residuals.parquet\",\"pyData/Intermediate/a_aCompustat.parquet\",\"pyData/Intermediate/m_aCompustat.parquet\"]" },
-                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/a_aCompustat.parquet\",\"pyData/Intermediate/m_aCompustat.parquet\"]" },
-                        ]
-                      }
-                    ]
-                  }
-                }
-                ResultSelector = { statusCode = 200 }
-                Retry          = local.sfn_retry_ecs
-                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCompustatAnnualFailed", ResultPath = "$.error" }]
-                End            = true
-              }
-              RunCompustatAnnualFailed = {
-                Type = "Pass"
-                End  = true
-              }
-            }
-          },
-          # Branch 7: CompustatQuarterly (dedicated task family — gated by preflight)
-          {
-            StartAt = "MaybeRunCompustatQuarterly"
-            States = {
-              MaybeRunCompustatQuarterly = {
-                Type = "Choice"
-                Choices = [{
-                  Variable      = "$.compustat_preflight.quarterly_has_new"
-                  BooleanEquals = true
-                  Next          = "RunCompustatQuarterly"
-                }]
-                Default = "SkipCompustatQuarterly"
-              }
-              SkipCompustatQuarterly = {
-                Type   = "Pass"
-                Result = { statusCode = 200, skipped = true, reason = "no_new_10Q_filings" }
-                End    = true
-              }
-              RunCompustatQuarterly = {
-                Type     = "Task"
-                Resource = "arn:aws:states:::ecs:runTask.sync"
-                Parameters = {
-                  LaunchType     = "FARGATE"
-                  Cluster        = aws_ecs_cluster.main.arn
-                  TaskDefinition = local.data_ingress_compustat_quarterly_task_family
-                  NetworkConfiguration = {
-                    AwsvpcConfiguration = {
-                      Subnets        = [for subnet in aws_subnet.public : subnet.id]
-                      SecurityGroups = [aws_security_group.ecs.id]
-                      AssignPublicIp = "ENABLED"
-                    }
-                  }
-                  Overrides = {
-                    ContainerOverrides = [
-                      {
-                        Name = "crosssection-data"
-                        Environment = [
-                          { Name = "EXECUTION_ID", "Value.$" = "$$.Execution.Id" },
-                          { Name = "STEP_FUNCTION_STATE_NAME", "Value.$" = "$$.State.Name" },
-                          { Name = "CROSSSECTION_JOB_NAME", Value = "RunCompustatQuarterly" },
-                          { Name = "CROSSSECTION_SCRIPT", Value = "DataDownloads/CompustatQuarterly.py" },
-                          { Name = "CROSSSECTION_SCRIPT_ARGS", Value = "[\"--universe_csv\",\"../Static/universe.csv\",\"--output_dir\",\"../pyData/Intermediate/compustat_quarterly\"]" },
-                          { Name = "CROSSSECTION_INPUT_ALLOWLIST", Value = "[\"Static/universe.csv\"]" },
-                          { Name = "CROSSSECTION_REQUIRED_INPUTS", Value = "[\"Static/universe.csv\"]" },
-                          { Name = "CROSSSECTION_OUTPUT_ALLOWLIST", Value = "[\"pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.parquet\",\"pyData/Intermediate/compustat_quarterly/outputs/quarterly_features.csv\",\"pyData/Intermediate/compustat_quarterly/outputs/quarterly_diagnostics_anchor_residuals.parquet\",\"pyData/Intermediate/m_QCompustat.parquet\"]" },
-                          { Name = "CROSSSECTION_EXPECTED_OUTPUTS", Value = "[\"pyData/Intermediate/m_QCompustat.parquet\"]" },
-                        ]
-                      }
-                    ]
-                  }
-                }
-                ResultSelector = { statusCode = 200 }
-                Retry          = local.sfn_retry_ecs
-                Catch          = [{ ErrorEquals = ["States.ALL"], Next = "RunCompustatQuarterlyFailed", ResultPath = "$.error" }]
-                End            = true
-              }
-              RunCompustatQuarterlyFailed = {
-                Type = "Pass"
-                End  = true
-              }
-            }
-          },
-          # Branch 8: GNPDeflator (independent)
+          # Branch 6: GNPDeflator (independent)
           {
             StartAt = "RunGNPDeflator"
             States = {
