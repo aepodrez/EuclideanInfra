@@ -270,6 +270,7 @@ def invoke_bedrock(prompt: str, bedrock_client) -> dict[str, Optional[str]]:
         messages=[{"role": "user", "content": [{"text": prompt}]}],
         inferenceConfig={"maxTokens": 16000, "temperature": 0},
     )
+    # R1 returns a reasoningContent block before the text block — find the text block
     text = ""
     for block in response["output"]["message"]["content"]:
         if "text" in block:
@@ -310,34 +311,86 @@ def _pct_err(actual: float, expected: float) -> float:
     return abs(actual - expected) / abs(expected)
 
 
-def validate_anchors(values: dict[str, float]) -> dict[str, float]:
+def validate_anchors(values: dict[str, float], industry: str = "GENERAL") -> dict[str, float]:
     """Returns {anchor_name: relative_residual}. 0 = perfect, >0.05 = suspect."""
     residuals: dict[str, float] = {}
 
+    def _check(name: str, actual: float, expected: float) -> None:
+        if actual and expected:
+            residuals[name] = _pct_err(actual, expected)
+
+    # --- Balance Sheet identity (all industries) ---
     at  = values.get("at",  0.0)
     lt  = values.get("lt",  0.0)
     seq = values.get("seq", 0.0)
-    if at and lt and seq:
-        residuals["BalanceSheet"] = _pct_err(at, lt + seq)
+    _check("BalanceSheet", at, lt + seq)
 
+    # --- Liabilities = Current + Noncurrent (not BANK/INSURANCE/FINANCIAL) ---
+    if industry not in ("BANK", "INSURANCE", "FINANCIAL"):
+        lct          = values.get("lct",          0.0)
+        lt_noncurrent = values.get("lt_noncurrent", 0.0)
+        _check("Liabilities_total", lt, lct + lt_noncurrent)
+
+    # --- Current Assets partition (not BANK/INSURANCE/FINANCIAL) ---
+    if industry not in ("BANK", "INSURANCE", "FINANCIAL"):
+        act = values.get("act", 0.0)
+        che = values.get("che", 0.0)
+        rect = values.get("rect", 0.0)
+        invt = values.get("invt", 0.0)
+        ivst = values.get("ivst", 0.0)
+        xpp  = values.get("xpp",  0.0)
+        aco  = values.get("aco",  0.0)
+        partition_sum = che + rect + invt + ivst + xpp + aco
+        _check("AssetsCurrent_partition", act, partition_sum)
+
+    # --- Current Liabilities partition (not BANK) ---
+    if industry != "BANK":
+        lct  = values.get("lct",  0.0)
+        ap   = values.get("ap",   0.0)
+        dlc  = values.get("dlc",  0.0)
+        drc  = values.get("drc",  0.0)
+        txp  = values.get("txp",  0.0)
+        xacc = values.get("xacc", 0.0)
+        lco  = values.get("lco",  0.0)
+        _check("LiabilitiesCurrent_partition", lct, ap + dlc + drc + txp + xacc + lco)
+
+    # --- Gross Profit identity ---
     sale = values.get("sale", 0.0)
     cogs = values.get("cogs", 0.0)
     gp   = values.get("gp",   0.0)
-    if sale and cogs and gp:
-        residuals["GrossProfit"] = _pct_err(gp, sale - cogs)
+    _check("GrossProfit", gp, sale - cogs)
 
+    # --- Net Income identity ---
     pi     = values.get("pi",     0.0)
     txt    = values.get("txt",    0.0)
     mib_ni = values.get("mib_ni", 0.0)
     ib     = values.get("ib",     0.0)
-    if pi and ib:
-        residuals["NetIncome"] = _pct_err(ib, pi - txt - mib_ni)
+    _check("NetIncome", ib, pi - txt - mib_ni)
 
+    # --- Cash Flow total (reported as sum, not residual) ---
     oancf = values.get("oancf", 0.0)
     ivncf = values.get("ivncf", 0.0)
     fincf = values.get("fincf", 0.0)
+    exre  = values.get("exre",  0.0)
     if oancf or ivncf or fincf:
-        residuals["CashFlow_componentSum"] = oancf + ivncf + fincf
+        residuals["CashFlow_componentSum"] = oancf + ivncf + fincf + exre
+
+    # --- Bank: Net Interest Income = Interest Income - Interest Expense ---
+    if industry == "BANK":
+        revt_interest = values.get("revt_interest", 0.0)
+        xint          = values.get("xint",          0.0)
+        # We don't have a direct net interest income field to validate against,
+        # so record the computed net as a diagnostic
+        if revt_interest or xint:
+            residuals["Bank_NetInterestIncome"] = revt_interest - xint
+
+    # --- Insurance: Net Premiums = Direct + Assumed - Ceded ---
+    if industry == "INSURANCE":
+        prem_net     = values.get("prem_net",     0.0)
+        prem_gross   = values.get("prem_gross",   0.0)
+        prem_assumed = values.get("prem_assumed", 0.0)
+        prem_ceded   = values.get("prem_ceded",   0.0)
+        _check("Insurance_NetPremiums", prem_net, prem_gross + prem_assumed - prem_ceded)
 
     return residuals
 
@@ -385,7 +438,7 @@ def map_filing(
     values = extract_values(facts, mapping)
 
     # 6. Validate
-    residuals = validate_anchors(values)
+    residuals = validate_anchors(values, industry)
     log.info("anchor residuals: %s", {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
 
     # 7. Build output row
