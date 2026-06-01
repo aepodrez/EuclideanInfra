@@ -44,10 +44,12 @@ MANIFEST_KEY     = os.environ.get("MANIFEST_KEY", "data-ingress/cache/compustat_
 EDGAR_IDENTITY   = os.environ.get("EDGAR_IDENTITY", "EuclideanResearch contact@example.com")
 MAX_SKIP_DAYS    = int(os.environ.get("MAX_SKIP_DAYS", "7"))
 EDGAR_FEED_LIMIT = int(os.environ.get("EDGAR_FEED_LIMIT", "100"))
+SQS_QUEUE_URL    = os.environ.get("SQS_QUEUE_URL", "")
 
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
-s3 = boto3.client("s3")
+s3  = boto3.client("s3")
+sqs = boto3.client("sqs") if SQS_QUEUE_URL else None
 
 
 def _http_get(url: str, timeout: int = 30) -> bytes:
@@ -56,21 +58,26 @@ def _http_get(url: str, timeout: int = 30) -> bytes:
         return resp.read()
 
 
-def _load_universe_ciks() -> set[str]:
-    """Read universe.csv from S3 and return CIKs as zero-padded 10-digit strings."""
+def _load_universe() -> tuple[set[str], dict[str, str]]:
+    """Read universe.csv from S3. Returns (cik_set, cik_to_ticker mapping)."""
     obj = s3.get_object(Bucket=S3_BUCKET, Key=UNIVERSE_KEY)
     text = obj["Body"].read().decode("utf-8", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
     ciks: set[str] = set()
+    cik_ticker: dict[str, str] = {}
     for row in reader:
         raw = (row.get("cik") or row.get("CIK") or "").strip()
         if not raw:
             continue
         try:
-            ciks.add(str(int(raw)).zfill(10))
+            cik_padded = str(int(raw)).zfill(10)
         except ValueError:
             continue
-    return ciks
+        ticker = (row.get("ticker") or row.get("Ticker") or "").strip().upper()
+        ciks.add(cik_padded)
+        if ticker:
+            cik_ticker[cik_padded] = ticker
+    return ciks, cik_ticker
 
 
 def _load_manifest() -> dict | None:
@@ -126,17 +133,19 @@ def _fetch_recent_filings(form_type: str) -> list[dict]:
     return entries
 
 
-def _has_new_filings(form_type: str, universe: set[str], last_seen: dict) -> tuple[bool, str, dict]:
-    """Return (has_new, reason, updated_last_seen).
+def _has_new_filings(
+    form_type: str, universe: set[str], last_seen: dict
+) -> tuple[bool, str, dict, list[dict]]:
+    """Return (has_new, reason, updated_last_seen, new_filings).
 
     last_seen maps cik -> latest accession we already processed.
-    has_new is True if any new filing is in-universe and not in last_seen.
+    new_filings is the list of {cik, accession, updated} dicts for new in-universe filings.
     """
     try:
         feed = _fetch_recent_filings(form_type)
     except Exception as e:
         log.error("EDGAR feed fetch failed for %s: %s", form_type, e)
-        return True, f"edgar_feed_error:{form_type}", last_seen
+        return True, f"edgar_feed_error:{form_type}", last_seen, []
 
     new_for_universe: list[dict] = []
     updated = dict(last_seen)
@@ -151,26 +160,49 @@ def _has_new_filings(form_type: str, universe: set[str], last_seen: dict) -> tup
             updated[f["cik"]] = f["accession"]
 
     if not new_for_universe:
-        return False, f"no_new_{form_type}_in_universe ({len(feed)} feed entries scanned)", updated
+        return False, f"no_new_{form_type}_in_universe ({len(feed)} feed entries scanned)", updated, []
 
     sample = ", ".join(f"{f['cik']}:{f['accession']}" for f in new_for_universe[:5])
-    return True, f"new_{form_type}_count={len(new_for_universe)} (e.g. {sample})", updated
+    return True, f"new_{form_type}_count={len(new_for_universe)} (e.g. {sample})", updated, new_for_universe
+
+
+def _publish_to_sqs(new_filings: list[dict], form_type: str, cik_ticker: dict[str, str]) -> None:
+    """Publish one SQS message per new filing. No-op if SQS_QUEUE_URL not configured."""
+    if not sqs or not SQS_QUEUE_URL or not new_filings:
+        return
+
+    for filing in new_filings:
+        cik = filing["cik"]
+        message = {
+            "cik":              cik,
+            "ticker":           cik_ticker.get(cik, ""),
+            "form_type":        form_type,
+            "accession_number": filing["accession"],
+        }
+        try:
+            sqs.send_message(
+                QueueUrl=SQS_QUEUE_URL,
+                MessageBody=json.dumps(message),
+            )
+            log.info("queued filing cik=%s accession=%s form=%s", cik, filing["accession"], form_type)
+        except Exception as e:
+            log.error("failed to publish SQS message for %s: %s", cik, e)
 
 
 def lambda_handler(event, context):
     now = datetime.now(timezone.utc)
-    log.info("preflight starting: bucket=%s manifest=%s", S3_BUCKET, MANIFEST_KEY)
+    log.info("preflight starting: bucket=%s manifest=%s sqs=%s", S3_BUCKET, MANIFEST_KEY, bool(SQS_QUEUE_URL))
 
-    universe = _load_universe_ciks()
-    log.info("loaded %d universe CIKs", len(universe))
+    universe, cik_ticker = _load_universe()
+    log.info("loaded %d universe CIKs (%d with tickers)", len(universe), len(cik_ticker))
 
     manifest = _load_manifest()
     if manifest is None:
         log.info("no manifest -> cold start, force run both")
         new_manifest = {
-            "annual":       {},
-            "quarterly":    {},
-            "last_run_at":  now.isoformat(),
+            "annual":      {},
+            "quarterly":   {},
+            "last_run_at": now.isoformat(),
         }
         _save_manifest(new_manifest)
         return {
@@ -196,9 +228,15 @@ def lambda_handler(event, context):
         annual_seen    = manifest.get("annual", {})
         quarterly_seen = manifest.get("quarterly", {})
 
-        annual_has_new, annual_reason, annual_seen = _has_new_filings("10-K", universe, annual_seen)
-        # 10-Q only matters for quarterly; some companies (20-F filers) only file annuals
-        quarterly_has_new, quarterly_reason, quarterly_seen = _has_new_filings("10-Q", universe, quarterly_seen)
+        annual_has_new, annual_reason, annual_seen, new_annual = (
+            _has_new_filings("10-K", universe, annual_seen)
+        )
+        quarterly_has_new, quarterly_reason, quarterly_seen, new_quarterly = (
+            _has_new_filings("10-Q", universe, quarterly_seen)
+        )
+
+        _publish_to_sqs(new_annual,    "10-K", cik_ticker)
+        _publish_to_sqs(new_quarterly, "10-Q", cik_ticker)
 
     new_manifest = {
         "annual":      annual_seen,

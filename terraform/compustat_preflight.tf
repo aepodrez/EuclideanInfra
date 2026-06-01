@@ -57,6 +57,12 @@ resource "aws_iam_role_policy" "compustat_preflight_s3" {
           "${aws_s3_bucket.pipeline_data.arn}/data-ingress/cache/compustat_preflight/*",
         ]
       },
+      {
+        Sid    = "SQSPublish"
+        Effect = "Allow"
+        Action = ["sqs:SendMessage"]
+        Resource = [aws_sqs_queue.edgar_filings.arn]
+      },
     ]
   })
 }
@@ -78,6 +84,7 @@ resource "aws_lambda_function" "compustat_preflight" {
       MANIFEST_KEY   = "data-ingress/cache/compustat_preflight/manifest.json"
       EDGAR_IDENTITY = var.edgar_identity
       MAX_SKIP_DAYS  = "7"
+      SQS_QUEUE_URL  = aws_sqs_queue.edgar_filings.url
     }
   }
 
