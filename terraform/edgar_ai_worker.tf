@@ -6,22 +6,10 @@ locals {
   aws_sdk_pandas_layer_arn = "arn:aws:lambda:${data.aws_region.current.name}:336392948345:layer:AWSSDKPandas-Python312:16"
 }
 
-# Bundle lambda_function.py (local) + xbrl_ai_mapper.py (from DataIngressModel submodule).
-# Note: the cross-repo path assumes EuclideanInfra and DataIngressModel are checked out
-# as siblings under the same parent directory (as in EuclideanWorkspace).
 data "archive_file" "edgar_ai_worker" {
   type        = "zip"
+  source_dir  = "${path.module}/../lambdas/edgar_ai_worker"
   output_path = "${path.module}/.terraform/edgar_ai_worker.zip"
-
-  source {
-    content  = file("${path.module}/../lambdas/edgar_ai_worker/lambda_function.py")
-    filename = "lambda_function.py"
-  }
-
-  source {
-    content  = file("${path.module}/../../DataIngressModel/DataDownloads/xbrl_ai_mapper.py")
-    filename = "xbrl_ai_mapper.py"
-  }
 }
 
 resource "aws_cloudwatch_log_group" "edgar_ai_worker" {
