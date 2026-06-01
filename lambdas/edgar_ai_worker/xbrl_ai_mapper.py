@@ -270,7 +270,13 @@ def invoke_bedrock(prompt: str, bedrock_client) -> dict[str, Optional[str]]:
         messages=[{"role": "user", "content": [{"text": prompt}]}],
         inferenceConfig={"maxTokens": 2048, "temperature": 0},
     )
-    text = response["output"]["message"]["content"][0]["text"].strip()
+    text = ""
+    for block in response["output"]["message"]["content"]:
+        if "text" in block:
+            text = block["text"].strip()
+            break
+    if not text:
+        raise ValueError(f"No text block in Bedrock response: {response['output']['message']['content']}")
 
     # Extract JSON — the model sometimes wraps in markdown despite instructions
     json_match = re.search(r"\{.*\}", text, re.DOTALL)
