@@ -437,13 +437,14 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL") -> dic
     ib     = values.get("ib",     0.0)
     _check("NetIncome", ib, pi - txt - mib_ni)
 
-    # --- Net Income attribution: ni = ib - mib_ni - preferred dividends ---
-    # For companies with preferred stock, ni (available to common) may differ
-    # from ib by preferred dividends in addition to minority interest.
-    # dvp captures preferred dividends paid; use it when available.
-    ni  = values.get("ni",  0.0)
-    dvp = values.get("dvp", 0.0)
-    _check("NetIncome_attribution", ni, ib - mib_ni - dvp)
+    # --- Net Income attribution: ni = ib - mib_ni ---
+    # Skip for companies with preferred stock: the ni-ib gap may reflect
+    # non-cash preferred accretion (not captured in any mapped field), which
+    # would produce a large false residual.
+    ni   = values.get("ni",   0.0)
+    pstk = values.get("pstk", 0.0)
+    if not pstk:
+        _check("NetIncome_attribution", ni, ib - mib_ni)
 
     # --- Cash Flow total (reported as sum, not residual) ---
     oancf = values.get("oancf", 0.0)
