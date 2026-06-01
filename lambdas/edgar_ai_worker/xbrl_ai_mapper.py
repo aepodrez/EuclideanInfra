@@ -27,7 +27,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     # Balance Sheet — Assets
     "at":        "Total Assets",
     "act":       "Total Current Assets",
-    "che":       "Cash and Cash Equivalents (pure cash only, NOT including short-term investments)",
+    "che":       "Cash and Cash Equivalents — use CashAndCashEquivalentsAtCarryingValue OR CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents (the post-2018 standard cash flow tag); assign this even if the tag name mentions RestrictedCash",
     "rect":      "Accounts Receivable Net (trade receivables; for banks use net loans)",
     "invt":      "Inventory Net",
     "ivst":      "Short-term Investments / Marketable Securities (current)",
@@ -47,7 +47,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "ap":            "Accounts Payable (trade)",
     "txp":           "Income Taxes Payable (current)",
     "drc":           "Deferred Revenue (current)",
-    "xacc":          "Accrued Liabilities / Accrued Expenses (current)",
+    "xacc":          "Accrued Liabilities / Accrued Expenses (current) — use AccruedLiabilitiesCurrent, EmployeeRelatedLiabilitiesCurrent, or composite tags like AccountsPayableAndOtherAccruedLiabilitiesCurrent when no standalone accrued tag exists",
     "lco":           "Other Current Liabilities",
     "lo":            "Other Noncurrent Liabilities",
     # Balance Sheet — Equity
@@ -82,7 +82,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "capx":   "Capital Expenditures (payments to acquire PP&E)",
     "dvc":    "Common Dividends Paid",
     "dvp":    "Preferred Dividends Paid",
-    "prstkc": "Common Stock Repurchases",
+    "prstkc": "Common Stock Repurchases — CASH FLOW STATEMENT only: use PaymentsForRepurchaseOfCommonStock. Do NOT use equity statement tags like StockRepurchasedDuringPeriodValue or TreasuryStockValueAcquiredCostMethod",
     "scstkc": "Proceeds from Issuance of Common Stock",
     "dltis":  "Proceeds from Issuance of Long-term Debt",
     "dltr":   "Repayments of Long-term Debt",
@@ -280,7 +280,8 @@ Rules:
 - Choose the tag that BEST semantically matches the field description.
 - Prefer specific tags over generic parent tags when both are present.
 - Do NOT map the same XBRL tag to more than one field (except seq and ceq may share StockholdersEquity tags if needed).
-- For composite tags that bundle multiple fields (e.g. CashCashEquivalentsAndShortTermInvestments), prefer more specific tags.
+- Do NOT assign a composite/parent tag to one field if a component of that composite is already assigned to another field (e.g. if AccountsPayableCurrent is assigned to ap, do not also assign AccountsPayableAndOtherAccruedLiabilitiesCurrent to aco or xacc — pick the more specific standalone tag instead).
+- For cash flow fields (oancf, ivncf, fincf, capx, prstkc, scstkc, dvc, dvp, dltis, dltr), only use tags that appear in the cash flow statement — never use equity statement or balance sheet tags.
 - Return ONLY a valid JSON object on a single line. No explanation, no markdown, no code block.
 
 Example format:
@@ -334,6 +335,15 @@ def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str]]) -
     for field, tag in mapping.items():
         if tag and tag in facts:
             values[field] = facts[tag]
+
+    # Derive lt_noncurrent = lt - lct if AI didn't assign it directly.
+    # Most companies don't tag a total noncurrent liabilities line in XBRL.
+    if "lt_noncurrent" not in values:
+        lt  = values.get("lt",  0.0)
+        lct = values.get("lct", 0.0)
+        if lt and lct:
+            values["lt_noncurrent"] = lt - lct
+
     return values
 
 
