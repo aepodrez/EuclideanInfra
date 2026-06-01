@@ -205,18 +205,20 @@ def fetch_xbrl_facts(cik: str, accession: str, form_type: str = "") -> dict[str,
             end_str = entry.get("end", "")
 
             if is_quarterly and start and end_str:
-                # Duration fact: compute period length to prefer YTD over QTD
+                # Duration fact: compute period length to prefer QTD over YTD.
+                # Compustat fundq stores standalone-quarter values (~90 days),
+                # not YTD cumulative (~270 days).
                 try:
                     duration = (_date.fromisoformat(end_str) - _date.fromisoformat(start)).days
                 except Exception:
-                    duration = 0
+                    duration = 9999
             else:
                 # Instant fact (balance sheet) or annual filing: fp=FY wins
                 fp = entry.get("fp", "")
-                duration = 9999 if fp == "FY" else 1
+                duration = 0 if fp == "FY" else 9999
 
             existing = best.get(concept)
-            if existing is None or duration > existing[1]:
+            if existing is None or duration < existing[1]:
                 best[concept] = (val, duration)
 
     facts = {concept: val for concept, (val, _) in best.items()}
