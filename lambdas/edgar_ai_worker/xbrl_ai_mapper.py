@@ -48,14 +48,14 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "txp":           "Income Taxes Payable (current)",
     "drc":           "Deferred Revenue (current)",
     "xacc":          "Accrued Liabilities / Accrued Expenses (current) — use AccruedLiabilitiesCurrent, EmployeeRelatedLiabilitiesCurrent, or composite tags like AccountsPayableAndOtherAccruedLiabilitiesCurrent when no standalone accrued tag exists",
-    "lco":           "Other Current Liabilities",
+    "lco":           "Other Current Liabilities — use OtherLiabilitiesCurrent, OperatingLeaseLiabilityCurrent, or similar current-liability tags not captured by dlc, ap, txp, drc, or xacc",
     "lo":            "Other Noncurrent Liabilities",
     # Balance Sheet — Equity
     "seq":  "Total Stockholders Equity (including NCI/minority interest) — used in balance sheet identity",
     "ceq":  "Common Equity attributable to parent shareholders",
     "pstk": "Preferred Stock carrying value",
     "re":   "Retained Earnings (Accumulated Deficit)",
-    "mib":  "Minority / Noncontrolling Interest (balance sheet carrying value)",
+    "mib":  "Minority / Noncontrolling Interest (balance sheet carrying value) — use NoncontrollingInterestMember or MinorityInterest tags. For limited partnerships using PartnersCapital/LimitedPartnersCapitalAccount, mib should be null (LP structures have no minority interest)",
     # Income Statement
     "sale":          "Net Revenue / Net Sales (operating revenue only; for banks use total interest + noninterest income)",
     "revt_interest": "Interest Income — bank total interest and fee income on loans/securities (banks only)",
@@ -78,7 +78,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "oancf":  "Net Cash from Operating Activities",
     "ivncf":  "Net Cash from Investing Activities",
     "fincf":  "Net Cash from Financing Activities",
-    "exre":   "Effect of Exchange Rate Changes on Cash",
+    "exre":   "Effect of Exchange Rate Changes on Cash — ONLY use EffectOfExchangeRateOnCash* tags. NEVER use CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect (that is the total net change in cash, not an FX effect); if no FX-effect-specific tag exists, leave null",
     "capx":   "Capital Expenditures (payments to acquire PP&E)",
     "dvc":    "Common Dividends Paid",
     "dvp":    "Preferred Dividends Paid",
@@ -286,6 +286,7 @@ Rules:
 - Do NOT map the same XBRL tag to more than one field (except seq and ceq may share StockholdersEquity tags if needed).
 - Do NOT assign a composite/parent tag to one field if a component of that composite is already assigned to another field (e.g. if AccountsPayableCurrent is assigned to ap, do not also assign AccountsPayableAndOtherAccruedLiabilitiesCurrent to aco or xacc — pick the more specific standalone tag instead).
 - For cash flow fields (oancf, ivncf, fincf, capx, prstkc, scstkc, dvc, dvp, dltis, dltr), only use tags that appear in the cash flow statement — never use equity statement or balance sheet tags.
+- NEVER assign CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect to any field — it is the total net change in cash (a derived sum), not a standalone line item.
 - Return ONLY a valid JSON object on a single line. No explanation, no markdown, no code block.
 
 Example format:
