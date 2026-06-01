@@ -268,7 +268,7 @@ def invoke_bedrock(prompt: str, bedrock_client) -> dict[str, Optional[str]]:
     response = bedrock_client.converse(
         modelId=_BEDROCK_MODEL,
         messages=[{"role": "user", "content": [{"text": prompt}]}],
-        inferenceConfig={"maxTokens": 2048, "temperature": 0},
+        inferenceConfig={"maxTokens": 16000, "temperature": 0},
     )
     text = ""
     for block in response["output"]["message"]["content"]:
