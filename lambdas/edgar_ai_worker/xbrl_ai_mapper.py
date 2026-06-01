@@ -356,11 +356,15 @@ def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str]]) -
         if lt and lct:
             values["lt_noncurrent"] = lt - lct
 
-    # Derive ceq = seq - pstk for companies with preferred stock where the AI
-    # mapped ceq and seq to the same tag (seq already includes preferred).
-    if "ceq" in values and "pstk" in values and "seq" in values:
-        if values.get("ceq") == values.get("seq") and values.get("pstk", 0.0) != 0.0:
-            values["ceq"] = values["seq"] - values["pstk"]
+    # Derive ceq = seq - pstk for companies with preferred stock.
+    # Fires when: (a) AI left ceq null, or (b) AI mapped ceq to same tag as seq.
+    # In both cases, common equity = total equity minus preferred stock carrying value.
+    seq_v  = values.get("seq")
+    pstk_v = values.get("pstk", 0.0)
+    ceq_v  = values.get("ceq")
+    if seq_v is not None and pstk_v:
+        if ceq_v is None or ceq_v == seq_v:
+            values["ceq"] = seq_v - pstk_v
 
     return values
 
