@@ -291,6 +291,7 @@ Rules:
 - NEVER assign CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect to any field — it is the total net change in cash (a derived sum), not a standalone line item.
 - A field may map to a LIST of XBRL tags when no single aggregate tag exists and the field is a known sum of components. Only use a list when necessary — prefer a single tag. Valid multi-tag fields: xsga, dp, xint, dlc. Example: {{"dp": ["Depreciation", "AmortizationOfIntangibleAssets"]}}.
 - Return ONLY a valid JSON object on a single line. No explanation, no markdown, no code block.
+- IMPORTANT: You must write the JSON as the very last thing in your response. End your entire response with the JSON object — do not add any text after it.
 
 Example format:
 {{"at": "Assets", "sale": "Revenues", "ib": "NetIncomeLoss", "dp": ["Depreciation", "AmortizationOfIntangibleAssets"], "oancf": null}}
@@ -318,9 +319,18 @@ def _parse_llm_json(text: str) -> dict[str, Optional[str | list[str]]]:
     """Extract and normalise the JSON mapping from an LLM response string.
 
     Values may be a single tag string, a list of tag strings (for sum fields),
-    or null.
+    or null. Uses the LAST JSON object in the text — the final answer, not any
+    intermediate examples the model may have written during reasoning.
     """
-    json_match = re.search(r"\{.*\}", text, re.DOTALL)
+    matches = list(re.finditer(r"\{[^{}]*\}", text, re.DOTALL))
+    # Prefer the last large object (the mapping); fall back to full greedy match
+    json_match = None
+    for m in reversed(matches):
+        if len(m.group(0)) > 100:
+            json_match = m
+            break
+    if not json_match:
+        json_match = re.search(r"\{.*\}", text, re.DOTALL)
     if not json_match:
         raise ValueError(f"No JSON object found in LLM response: {text[:200]}")
     raw = json.loads(json_match.group(0))
