@@ -298,11 +298,11 @@ JSON mapping:"""
 # ---------------------------------------------------------------------------
 # Bedrock invocation
 # ---------------------------------------------------------------------------
-_BEDROCK_MODEL_FAST   = "us.amazon.nova-lite-v1:0"
+_BEDROCK_MODEL_FAST   = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 _BEDROCK_MODEL_STRONG = "us.deepseek.r1-v1:0"
 
 _MODEL_INFERENCE_CONFIG = {
-    _BEDROCK_MODEL_FAST:   {"maxTokens": 2048,  "temperature": 0},
+    _BEDROCK_MODEL_FAST:   {"maxTokens": 4096,  "temperature": 0},
     _BEDROCK_MODEL_STRONG: {"maxTokens": 16000, "temperature": 0},
 }
 
