@@ -328,7 +328,7 @@ def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
     payload = json.dumps({
         "model": _OPENROUTER_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 16000,
+        "max_tokens": 4096,
         "temperature": 0,
     }).encode()
 
@@ -344,13 +344,29 @@ def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
         method="POST",
     )
 
-    for attempt in range(1, 4):
+    for attempt in range(1, 6):
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 body = json.loads(resp.read())
             break
+        except urllib.error.HTTPError as exc:
+            if attempt == 5:
+                raise
+            if exc.code == 429:
+                # Read Retry-After if present; otherwise use long exponential backoff
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                wait = int(retry_after) if retry_after and retry_after.isdigit() else 30 * attempt
+                try:
+                    err_body = exc.read().decode(errors="replace")
+                    log.warning("OpenRouter 429 attempt %d: %s — retrying in %ds", attempt, err_body[:200], wait)
+                except Exception:
+                    log.warning("OpenRouter 429 attempt %d — retrying in %ds", attempt, wait)
+            else:
+                wait = 5 * attempt
+                log.warning("OpenRouter attempt %d failed (HTTP %d), retrying in %ds", attempt, exc.code, wait)
+            time.sleep(wait)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            if attempt == 3:
+            if attempt == 5:
                 raise
             wait = 5 * attempt
             log.warning("OpenRouter attempt %d failed (%s), retrying in %ds", attempt, exc, wait)
