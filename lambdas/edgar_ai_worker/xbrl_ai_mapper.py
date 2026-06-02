@@ -402,7 +402,15 @@ def _invoke_kimi(prompt: str, api_key: str) -> tuple[str, dict[str, Optional[str
     except ValueError:
         log.warning("Free tier returned no JSON — falling back to paid kimi-k2.6")
 
-    return _call_openrouter(_OPENROUTER_MODEL_PAID, prompt, api_key)
+    # Paid model sometimes omits the JSON from its reasoning on first attempt — retry once.
+    for attempt in range(1, 3):
+        try:
+            return _call_openrouter(_OPENROUTER_MODEL_PAID, prompt, api_key)
+        except ValueError:
+            if attempt == 2:
+                raise
+            log.warning("Paid model attempt %d returned no JSON — retrying", attempt)
+            time.sleep(5)
 
 
 # ---------------------------------------------------------------------------
