@@ -68,12 +68,15 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "xint":   "Interest Expense — prefer a combined interest expense tag; if none exists, use a LIST of component tags",
     "dp":     "Depreciation & Amortization — prefer a combined D&A tag (DepreciationDepletionAndAmortization); if none exists, use a LIST of component tags (e.g. [\"Depreciation\", \"AmortizationOfIntangibleAssets\"])",
     "oiadp":  "Operating Income / Loss (AFTER D&A)",
+    "oibdp":  "Operating Income BEFORE D&A (EBITDA) — use OperatingIncomeLoss + DepreciationAndAmortization if no single EBITDA tag exists; often not directly tagged",
     "nopi":   "Non-operating Income (Expense) net",
-    "pi":     "Pre-tax Income (Income Before Income Taxes)",
-    "txt":    "Income Tax Expense (Benefit)",
+    "pi":     "Pre-tax Income from Continuing Operations (Income Before Income Taxes; excludes discontinued operations)",
+    "txt":    "Income Tax Expense (Benefit) from Continuing Operations",
     "mib_ni": "Net Income attributable to Noncontrolling Interest (NCI income flow)",
-    "ib":     "Net Income including NCI / Net Income (Loss) total",
-    "ni":     "Net Income attributable to parent / common shareholders",
+    "ib":     "Income from Continuing Operations net of tax (= pi - txt); same as ni for companies with no discontinued ops or extraordinary items",
+    "do":     "Income / Loss from Discontinued Operations, net of tax — use IncomeLossFromDiscontinuedOperationsNetOfTax or similar; null if no discontinued operations",
+    "xi":     "Extraordinary Items and Discontinued Operations, net of tax (rare; effectively eliminated post-2015 under US GAAP)",
+    "ni":     "Net Income (Loss) — total consolidated net income including discontinued ops: ni = ib + do + xi",
     # Cash Flow
     "oancf":  "Net Cash from Operating Activities",
     "ivncf":  "Net Cash from Investing Activities",
@@ -94,10 +97,12 @@ These accounting identities will naturally hold when tags are mapped correctly.
 Do NOT choose a tag just to satisfy an identity — if no clearly matching tag exists, return null.
   1. at = lt + seq                              (Total Assets = Total Liabilities + Total Equity)
   2. gp = sale - cogs                           (Gross Profit = Revenue - Cost of Revenue)
-  3. ib ≈ pi - txt - mib_ni                    (Net Income ≈ Pre-tax Income - Tax - NCI income)
-  4. oancf + ivncf + fincf + exre ≈ change in cash balance (Cash Flow Statement)
-  5. ni = ib - mib_ni                          (Parent Net Income = Total NI - NCI income)
-  6. sale = revt_interest + revt_noninterest   (Bank Total Revenue; banks only)
+  3. ib = pi - txt                              (Continuing ops net income = Pre-tax Income - Tax)
+  4. ni = ib + do + xi                          (Total Net Income = Continuing ops + Discontinued ops + Extraordinary items)
+  5. oibdp = oiadp + dp                         (EBITDA = Operating Income + D&A)
+  6. seq = ceq + pstk                           (Total Equity = Common Equity + Preferred Stock)
+  7. oancf + ivncf + fincf + exre ≈ change in cash balance (Cash Flow Statement)
+  8. sale = revt_interest + revt_noninterest    (Bank Total Revenue; banks only)
 """
 
 # ---------------------------------------------------------------------------
@@ -258,6 +263,7 @@ def build_prompt(tag_values: dict[str, float], form_type: str, industry: str, si
     )
 
     sic_label = f"SIC {sic}" if sic else ""
+    sic_int = int(sic) if sic and sic.strip().isdigit() else 0
     if industry in ("BANK", "FINANCIAL"):
         industry_note = (
             f"\nNote: {sic_label} ({industry}). "
@@ -265,7 +271,20 @@ def build_prompt(tag_values: dict[str, float], form_type: str, industry: str, si
             "rect = net loans and leases receivable. "
             "cogs, invt, gp, and xsga should be null — banks have no inventory or cost of goods sold. "
         )
-    elif industry in ("UTILITY", "INSURANCE", "REIT"):
+    elif industry == "UTILITY":
+        industry_note = (
+            f"\nNote: {sic_label} (UTILITY). "
+            "sale = operating revenues (use RevenuesNet, ElectricUtilityRevenue, or UtilityRevenue tags). "
+            "dp includes depletion for gas utilities. "
+        )
+    elif 1300 <= sic_int <= 1399:
+        industry_note = (
+            f"\nNote: {sic_label} (Oil & Gas). "
+            "dp includes depletion and amortization of oil/gas properties (DepletionDepreciationAndAmortization). "
+            "Exploration costs (xrd proxy) may be expensed (successful-efforts) or capitalized. "
+            "cogs = lease operating expenses + production taxes. "
+        )
+    elif industry in ("INSURANCE", "REIT"):
         industry_note = f"\nNote: {sic_label} ({industry})." if sic_label else f"\nNote: {industry}."
     else:
         industry_note = f"\nNote: {sic_label}." if sic_label else ""
@@ -519,10 +538,32 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
     ib     = values.get("ib",     0.0)
     _check("NetIncome", ib, pi - txt)
 
-    # --- Net Income attribution: ni should equal ib (both map to NetIncomeLoss post-ASC 810) ---
+    # --- Net Income attribution: ni = ib + discontinued ops + extraordinary items ---
     ni = values.get("ni", 0.0)
+    do = values.get("do", 0.0)
+    xi = values.get("xi", 0.0)
     if ni and ib:
-        _check("NetIncome_attribution", ni, ib)
+        _check("NetIncome_attribution", ni, ib + do + xi)
+
+    # --- EBITDA identity: oibdp = oiadp + dp ---
+    oiadp = values.get("oiadp", 0.0)
+    oibdp = values.get("oibdp", 0.0)
+    dp    = values.get("dp",    0.0)
+    if oibdp and oiadp and dp:
+        _check("EBITDA", oibdp, oiadp + dp)
+
+    # --- Equity decomposition: seq = ceq + pstk ---
+    ceq  = values.get("ceq",  0.0)
+    pstk = values.get("pstk", 0.0)
+    seq  = values.get("seq",  0.0)
+    if seq and ceq and pstk:
+        _check("Equity_decomposition", seq, ceq + pstk)
+
+    # --- Balance sheet sign sanity ---
+    for field in ("che", "rect", "invt", "dltt", "at", "act", "ppent"):
+        v = values.get(field)
+        if v is not None and v < 0:
+            residuals[f"Sign_{field}"] = abs(v)
 
 # --- Cash Flow total: component sum should equal reported net change in cash ---
     oancf = values.get("oancf", 0.0)
