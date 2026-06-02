@@ -35,20 +35,10 @@ log.setLevel(logging.INFO)
 
 S3_BUCKET = os.environ["S3_BUCKET"]
 
-_s3       = boto3.client("s3")
-_bedrock  = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_REGION", "us-east-1"))
-_secrets  = boto3.client("secretsmanager")
+_s3      = boto3.client("s3")
+_bedrock = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 
-# Cached at cold start — avoids a Secrets Manager call on every invocation.
-_openrouter_api_key: str | None = None
-
-
-def _get_openrouter_key() -> str:
-    global _openrouter_api_key
-    if _openrouter_api_key is None:
-        secret_name = os.environ["OPENROUTER_SECRET_NAME"]
-        _openrouter_api_key = _secrets.get_secret_value(SecretId=secret_name)["SecretString"]
-    return _openrouter_api_key
+_OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
 
 
 def _s3_key(form_type: str, cik: str, report_date: str) -> str:
@@ -95,7 +85,7 @@ def _process_message(body: dict) -> None:
         ticker=ticker,
         sic=sic,
         bedrock_client=_bedrock,
-        openrouter_api_key=_get_openrouter_key(),
+        openrouter_api_key=_OPENROUTER_API_KEY,
     )
 
     report_date = row.get("datadate", "unknown")

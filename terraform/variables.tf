@@ -77,3 +77,10 @@ variable "edgar_identity" {
   sensitive   = true
   default     = ""
 }
+
+variable "openrouter_api_key" {
+  description = "OpenRouter API key for Kimi K2.6 strong-model fallback"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
