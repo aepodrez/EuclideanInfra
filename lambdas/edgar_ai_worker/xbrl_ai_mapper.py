@@ -298,8 +298,9 @@ JSON mapping:"""
 # ---------------------------------------------------------------------------
 # Model configuration
 # ---------------------------------------------------------------------------
-_OPENROUTER_API_URL   = "https://openrouter.ai/api/v1/chat/completions"
-_OPENROUTER_MODEL     = "moonshotai/kimi-k2.6:free"
+_OPENROUTER_API_URL    = "https://openrouter.ai/api/v1/chat/completions"
+_OPENROUTER_MODEL_FREE = "moonshotai/kimi-k2.6:free"
+_OPENROUTER_MODEL_PAID = "moonshotai/kimi-k2.6"
 
 # Priority-ordered XBRL tags for the net change in cash this period.
 _DCASH_TAGS = [
@@ -323,10 +324,10 @@ def _parse_llm_json(text: str) -> dict[str, Optional[str]]:
     }
 
 
-def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
-    """Call Kimi K2.6 via OpenRouter (OpenAI-compatible chat completions)."""
+def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
+    """Single OpenRouter call. Returns (model_used, parsed_mapping). Raises on HTTP error."""
     payload = json.dumps({
-        "model": _OPENROUTER_MODEL,
+        "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 16000,
         "temperature": 0,
@@ -344,49 +345,49 @@ def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
         method="POST",
     )
 
-    for attempt in range(1, 6):
+    for attempt in range(1, 4):
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 body = json.loads(resp.read())
+            break
         except urllib.error.HTTPError as exc:
-            if attempt == 5:
+            if attempt == 3 or exc.code != 429:
                 raise
-            if exc.code == 429:
-                retry_after = exc.headers.get("Retry-After") if exc.headers else None
-                wait = int(retry_after) if retry_after and retry_after.isdigit() else 30 * attempt
-                try:
-                    err_body = exc.read().decode(errors="replace")
-                    log.warning("OpenRouter 429 attempt %d: %s — retrying in %ds", attempt, err_body[:200], wait)
-                except Exception:
-                    log.warning("OpenRouter 429 attempt %d — retrying in %ds", attempt, wait)
-            else:
-                wait = 5 * attempt
-                log.warning("OpenRouter attempt %d failed (HTTP %d), retrying in %ds", attempt, exc.code, wait)
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            wait = int(retry_after) if retry_after and retry_after.isdigit() else 30 * attempt
+            try:
+                err_body = exc.read().decode(errors="replace")
+                log.warning("OpenRouter 429 (%s) attempt %d: %s — retrying in %ds", model, attempt, err_body[:200], wait)
+            except Exception:
+                log.warning("OpenRouter 429 (%s) attempt %d — retrying in %ds", model, attempt, wait)
             time.sleep(wait)
-            continue
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            if attempt == 5:
+            if attempt == 3:
                 raise
             wait = 5 * attempt
-            log.warning("OpenRouter attempt %d failed (%s), retrying in %ds", attempt, exc, wait)
+            log.warning("OpenRouter (%s) attempt %d failed (%s), retrying in %ds", model, attempt, exc, wait)
             time.sleep(wait)
-            continue
 
-        msg = body["choices"][0]["message"]
-        reasoning = msg.get("reasoning") or ""
-        if reasoning:
-            log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:2000])
-        # Paid Kimi K2.6 returns content=null; JSON answer is at the end of reasoning.
-        text = (msg.get("content") or reasoning or "").strip()
-        try:
-            return _parse_llm_json(text)
-        except ValueError:
-            if attempt == 5:
-                raise
-            log.warning("Kimi attempt %d returned no JSON (reasoning %d chars) — retrying", attempt, len(reasoning))
-            time.sleep(5 * attempt)
+    msg = body["choices"][0]["message"]
+    reasoning = msg.get("reasoning") or ""
+    if reasoning:
+        log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:2000])
+    text = (msg.get("content") or reasoning or "").strip()
+    return model, _parse_llm_json(text)
 
-    raise RuntimeError("_invoke_kimi exhausted retries without a valid JSON response")
+
+def _invoke_kimi(prompt: str, api_key: str) -> tuple[str, dict[str, Optional[str]]]:
+    """Try free tier first; fall back to paid if rate-limited. Returns (model_used, mapping)."""
+    try:
+        return _call_openrouter(_OPENROUTER_MODEL_FREE, prompt, api_key)
+    except urllib.error.HTTPError as exc:
+        if exc.code != 429:
+            raise
+        log.warning("Free tier rate-limited — falling back to paid kimi-k2.6")
+    except ValueError:
+        log.warning("Free tier returned no JSON — falling back to paid kimi-k2.6")
+
+    return _call_openrouter(_OPENROUTER_MODEL_PAID, prompt, api_key)
 
 
 # ---------------------------------------------------------------------------
@@ -537,8 +538,8 @@ def map_filing(
 
     # 4. Map with Kimi K2.6
     prompt = build_prompt(facts, form_type, industry)
-    mapping = _invoke_kimi(prompt, openrouter_api_key)
-    log.info("Kimi produced %d field assignments", sum(1 for v in mapping.values() if v))
+    model_used, mapping = _invoke_kimi(prompt, openrouter_api_key)
+    log.info("Kimi (%s) produced %d field assignments", model_used, sum(1 for v in mapping.values() if v))
 
     # 5. Extract numeric values
     values = extract_values(facts, mapping)
@@ -558,6 +559,6 @@ def map_filing(
     row.update(values)
     row["_anchor_residuals"] = json.dumps(residuals)
     row["_ai_mapping"]       = json.dumps(mapping)
-    row["_model_used"]       = _OPENROUTER_MODEL
+    row["_model_used"]       = model_used
 
     return row
