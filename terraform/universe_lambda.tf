@@ -67,7 +67,7 @@ resource "aws_iam_role_policy" "universe_downloader" {
         Effect = "Allow"
         Action = ["s3:GetObject"]
         Resource = [
-          "${aws_s3_bucket.pipeline_data.arn}/data-ingress/Static/universe.csv"
+          "${aws_s3_bucket.pipeline_data.arn}/universe/universe.csv"
         ]
       },
       {
@@ -142,7 +142,7 @@ resource "aws_iam_role_policy" "universe_sic_worker" {
         Effect = "Allow"
         Action = ["s3:PutObject"]
         Resource = [
-          "${aws_s3_bucket.pipeline_data.arn}/data-ingress/Static/universe.csv"
+          "${aws_s3_bucket.pipeline_data.arn}/universe/universe.csv"
         ]
       },
       {
@@ -174,7 +174,7 @@ resource "aws_lambda_function" "universe_downloader" {
   environment {
     variables = {
       S3_BUCKET                = aws_s3_bucket.pipeline_data.id
-      UNIVERSE_KEY             = "data-ingress/Static/universe.csv"
+      UNIVERSE_KEY             = "universe/universe.csv"
       MANIFEST_PREFIX          = "universe/work"
       EDGAR_IDENTITY           = var.edgar_identity
       SIC_WORKER_FUNCTION_NAME = local.universe_sic_worker_function_name
@@ -198,7 +198,7 @@ resource "aws_lambda_function" "universe_sic_worker" {
   environment {
     variables = {
       S3_BUCKET       = aws_s3_bucket.pipeline_data.id
-      UNIVERSE_KEY    = "data-ingress/Static/universe.csv"
+      UNIVERSE_KEY    = "universe/universe.csv"
       MANIFEST_PREFIX = "universe/work"
       EDGAR_IDENTITY  = var.edgar_identity
     }
