@@ -376,7 +376,9 @@ def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
     reasoning = msg.get("reasoning") or ""
     if reasoning:
         log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:2000])
-    text = msg.get("content", "").strip()
+    # Paid Kimi K2.6 returns content=null when it uses the reasoning field;
+    # the JSON answer is embedded at the end of the reasoning text.
+    text = (msg.get("content") or reasoning or "").strip()
     return _parse_llm_json(text)
 
 
