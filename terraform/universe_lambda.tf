@@ -168,7 +168,7 @@ resource "aws_lambda_function" "universe_downloader" {
   handler          = "lambda_function.lambda_handler"
   filename         = data.archive_file.universe_downloader.output_path
   source_code_hash = data.archive_file.universe_downloader.output_base64sha256
-  memory_size      = 512
+  memory_size      = 256
   timeout          = 60
 
   environment {
@@ -192,7 +192,7 @@ resource "aws_lambda_function" "universe_sic_worker" {
   handler          = "lambda_function.lambda_handler"
   filename         = data.archive_file.universe_sic_worker.output_path
   source_code_hash = data.archive_file.universe_sic_worker.output_base64sha256
-  memory_size      = 512
+  memory_size      = 256
   timeout          = 900
 
   environment {
