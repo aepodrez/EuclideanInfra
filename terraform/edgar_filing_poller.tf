@@ -97,8 +97,8 @@ resource "aws_lambda_function" "edgar_filing_poller" {
 
 resource "aws_cloudwatch_event_rule" "edgar_filing_poller_schedule" {
   name                = "${var.project_name}-edgar-filing-poller-schedule${local.env_suffix}"
-  description         = "Daily trigger for edgar_filing_poller at 09:00 UTC"
-  schedule_expression = "cron(0 9 * * ? *)"
+  description         = "Daily trigger for edgar_filing_poller at 06:30 UTC (30 min after universe_downloader)"
+  schedule_expression = "cron(30 6 * * ? *)"
   tags                = local.common_tags
 }
 
