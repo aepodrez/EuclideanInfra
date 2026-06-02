@@ -27,65 +27,65 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     # Balance Sheet — Assets
     "at":        "Total Assets",
     "act":       "Total Current Assets",
-    "che":       "Cash and Cash Equivalents — use CashAndCashEquivalentsAtCarryingValue OR CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents (the post-2018 standard cash flow tag); assign this even if the tag name mentions RestrictedCash",
-    "rect":      "Accounts Receivable Net (trade receivables; for banks use net loans)",
+    "che":       "Cash and Equivalents (CashAndCashEquivalentsAtCarryingValue or post-2018 CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents)",
+    "rect":      "Accounts Receivable Net (banks: net loans)",
     "invt":      "Inventory Net",
-    "ivst":      "Short-term Investments / Marketable Securities (current)",
+    "ivst":      "Short-term Investments / Marketable Securities",
     "xpp":       "Prepaid Expenses (current)",
     "aco":       "Other Current Assets",
-    "ppent":     "Property Plant & Equipment Net (EXCLUDE operating lease ROU assets)",
-    "ppent_rou": "Operating Lease Right-of-Use Assets (ASC 842, post-2019)",
-    "intan":     "Intangible Assets Net (EXCLUDING goodwill)",
+    "ppent":     "Property Plant & Equipment NET (PropertyPlantAndEquipmentNet; excludes ROU)",
+    "ppent_rou": "Operating Lease Right-of-Use Assets (ASC 842)",
+    "intan":     "Intangible Assets Net (excluding goodwill)",
     "gdwl":      "Goodwill",
-    "ivao":      "Long-term Investments / Noncurrent Investments",
+    "ivao":      "Long-term Investments",
     # Balance Sheet — Liabilities
-    "lt":            "Total Liabilities — use the Liabilities concept. Do NOT use LiabilitiesAndStockholdersEquity (that is total assets, not liabilities alone). Leave null if no standalone Liabilities tag is present",
+    "lt":            "Total Liabilities (Liabilities tag only; null if absent)",
     "lct":           "Total Current Liabilities",
     "lt_noncurrent": "Total Noncurrent Liabilities",
-    "dlc":           "Short-term Debt (current maturities of LT debt + short-term borrowings)",
+    "dlc":           "Short-term Debt (current maturities + ST borrowings)",
     "dltt":          "Long-term Debt Noncurrent",
     "ap":            "Accounts Payable (trade)",
-    "txp":           "Income Taxes Payable (current)",
+    "txp":           "Income Taxes Payable",
     "drc":           "Deferred Revenue (current)",
-    "xacc":          "Accrued Liabilities / Accrued Expenses (current) — use AccruedLiabilitiesCurrent, EmployeeRelatedLiabilitiesCurrent, or composite tags like AccountsPayableAndOtherAccruedLiabilitiesCurrent when no standalone accrued tag exists",
-    "lco":           "Other Current Liabilities — use OtherLiabilitiesCurrent, OperatingLeaseLiabilityCurrent, or similar current-liability tags not captured by dlc, ap, txp, drc, or xacc",
+    "xacc":          "Accrued Liabilities (AccruedLiabilitiesCurrent or composite fallback)",
+    "lco":           "Other Current Liabilities (OtherLiabilitiesCurrent, OperatingLeaseLiabilityCurrent)",
     "lo":            "Other Noncurrent Liabilities",
     # Balance Sheet — Equity
-    "seq":  "Total Stockholders Equity (including NCI/minority interest) — used in balance sheet identity",
-    "ceq":  "Common Equity attributable to parent shareholders",
+    "seq":  "Total Stockholders Equity INCLUDING NCI (StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest)",
+    "ceq":  "Common Equity attributable to parent",
     "pstk": "Preferred Stock carrying value",
     "re":   "Retained Earnings (Accumulated Deficit)",
-    "mib":  "Minority / Noncontrolling Interest (balance sheet carrying value) — use NoncontrollingInterestMember or MinorityInterest tags. For limited partnerships using PartnersCapital/LimitedPartnersCapitalAccount, mib should be null (LP structures have no minority interest)",
+    "mib":  "Noncontrolling Interest balance (null for LP structures using PartnersCapital)",
     # Income Statement
-    "sale":          "Net Revenue / Net Sales (operating revenue only; for banks use the NET revenue line = net interest income + noninterest income, NOT gross interest income)",
-    "revt_interest": "Interest Income — bank total interest and fee income on loans/securities (banks only)",
-    "revt_noninterest": "Non-Interest Income — bank fees, trading gains, service charges (banks only)",
+    "sale":          "Net Revenue / Net Sales (banks: net interest + noninterest income)",
+    "revt_interest": "Interest Income (banks only)",
+    "revt_noninterest": "Non-Interest Income (banks only)",
     "cogs":   "Cost of Goods Sold / Cost of Revenue",
     "gp":     "Gross Profit",
-    "xsga":   "Selling General & Administrative Expense — prefer a combined SGA tag; if none exists, use a LIST of the selling and G&A component tags (e.g. [\"SellingAndMarketingExpense\", \"GeneralAndAdministrativeExpense\"])",
+    "xsga":   "Selling, General & Administrative Expense",
     "xrd":    "Research & Development Expense",
     "xad":    "Advertising Expense",
-    "xint":   "Interest Expense — prefer a combined interest expense tag; if none exists, use a LIST of component tags",
-    "dp":     "Depreciation & Amortization — prefer a combined D&A tag (DepreciationDepletionAndAmortization); if none exists, use a LIST of component tags (e.g. [\"Depreciation\", \"AmortizationOfIntangibleAssets\"])",
+    "xint":   "Interest Expense",
+    "dp":     "Depreciation & Amortization (prefer DepreciationDepletionAndAmortization)",
     "oiadp":  "Operating Income / Loss (AFTER D&A)",
-    "oibdp":  "Operating Income BEFORE D&A (EBITDA) — use OperatingIncomeLoss + DepreciationAndAmortization if no single EBITDA tag exists; often not directly tagged",
-    "nopi":   "Non-operating Income (Expense) net",
-    "pi":     "Pre-tax Income from Continuing Operations (Income Before Income Taxes; excludes discontinued operations)",
+    "oibdp":  "Operating Income BEFORE D&A (EBITDA; often not directly tagged)",
+    "nopi":   "Non-operating Income net — includes gains/losses on asset sales",
+    "pi":     "Pre-tax Income from Continuing Operations",
     "txt":    "Income Tax Expense (Benefit) from Continuing Operations",
-    "mib_ni": "Net Income attributable to Noncontrolling Interest (NCI income flow)",
-    "ib":     "Income from Continuing Operations net of tax (= pi - txt); same as ni for companies with no discontinued ops or extraordinary items",
-    "do":     "Income / Loss from Discontinued Operations, net of tax — use IncomeLossFromDiscontinuedOperationsNetOfTax or similar; null if no discontinued operations",
-    "xi":     "Extraordinary Items and Discontinued Operations, net of tax (rare; effectively eliminated post-2015 under US GAAP)",
-    "ni":     "Net Income (Loss) — total consolidated net income including discontinued ops: ni = ib + do + xi",
-    # Cash Flow
+    "mib_ni": "Net Income attributable to NCI",
+    "ib":     "Income from Continuing Operations net of tax (ib = pi - txt)",
+    "do":     "Discontinued Operations net of tax (IncomeLossFromDiscontinuedOperationsNetOfTax)",
+    "xi":     "Extraordinary Items net of tax (rare post-2015)",
+    "ni":     "Net Income — total consolidated (ni = ib + do + xi)",
+    # Cash Flow — outflow fields stored as POSITIVE magnitudes
     "oancf":  "Net Cash from Operating Activities",
     "ivncf":  "Net Cash from Investing Activities",
     "fincf":  "Net Cash from Financing Activities",
-    "exre":   "Effect of Exchange Rate Changes on Cash — ONLY use EffectOfExchangeRateOnCash* tags. NEVER use CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect (that is the total net change in cash, not an FX effect); if no FX-effect-specific tag exists, leave null",
-    "capx":   "Capital Expenditures (payments to acquire PP&E)",
+    "exre":   "Effect of FX on Cash (EffectOfExchangeRateOnCash* only)",
+    "capx":   "Capital Expenditures (PaymentsToAcquirePropertyPlantAndEquipment)",
     "dvc":    "Common Dividends Paid",
     "dvp":    "Preferred Dividends Paid",
-    "prstkc": "Common Stock Repurchases — CASH FLOW STATEMENT only: use PaymentsForRepurchaseOfCommonStock. Do NOT use equity statement tags like StockRepurchasedDuringPeriodValue or TreasuryStockValueAcquiredCostMethod",
+    "prstkc": "Common Stock Repurchases (PaymentsForRepurchaseOfCommonStock; cash flow only)",
     "scstkc": "Proceeds from Issuance of Common Stock",
     "dltis":  "Proceeds from Issuance of Long-term Debt",
     "dltr":   "Repayments of Long-term Debt",
@@ -289,38 +289,36 @@ def build_prompt(tag_values: dict[str, float], form_type: str, industry: str, si
     else:
         industry_note = f"\nNote: {sic_label}." if sic_label else ""
 
-    return f"""You are mapping XBRL tags from a SEC {form_type} filing to Compustat financial data fields.
-Your goal is to reproduce the same field values that Compustat (WRDS) would assign for this filing.
-When choosing between candidate tags, pick the one that best matches Compustat's documented field definition — not just the closest label match.
+    return f"""You are mapping XBRL tags from a SEC {form_type} filing to Compustat (WRDS) fields.
+Choose the tag matching Compustat's documented definition — not the closest label match.
 
-XBRL tags present in this filing (tag: USD value):
+XBRL tags in this filing (tag: USD value):
 {tag_lines}
 
-Map each Compustat field below to exactly ONE XBRL tag from the list above.
-Return null for a field if no appropriate tag is present.
+Map each field below to ONE tag (or a LIST per rules). Return null if no clear match — never assign to satisfy an identity.
 {industry_note}
 {IDENTITY_PROMPT}
 
-Compustat fields to map:
+Fields:
 {field_lines}
 
 Rules:
-- Choose the tag that BEST semantically matches the field description.
-- Prefer specific tags over generic parent tags when both are present.
-- Return null for any field where no XBRL tag clearly and specifically matches — null is always correct when the data is not present. Never assign a tag just to satisfy an accounting identity or to make a partition sum to its total.
-- Sub-component fields (xpp, aco, lco, ivst, mib, mib_ni, pstk, drc, txp, etc.) should be null when the filing does not report that specific line item with its own tag.
-- Do NOT map the same XBRL tag to more than one field (except seq and ceq may share StockholdersEquity tags if needed).
-- Do NOT assign a composite/parent tag to one field if a component of that composite is already assigned to another field (e.g. if AccountsPayableCurrent is assigned to ap, do not also assign AccountsPayableAndOtherAccruedLiabilitiesCurrent to aco or xacc — pick the more specific standalone tag instead).
-- For cash flow fields (oancf, ivncf, fincf, capx, prstkc, scstkc, dvc, dvp, dltis, dltr), only use tags that appear in the cash flow statement — never use equity statement or balance sheet tags.
-- NEVER assign CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect to any field — it is the total net change in cash (a derived sum), not a standalone line item.
-- A field may map to a LIST of XBRL tags when no single aggregate tag exists and the field is a known sum of components. Only use a list when necessary — prefer a single tag. Valid multi-tag fields: xsga, dp, xint, dlc. Example: {{"dp": ["Depreciation", "AmortizationOfIntangibleAssets"]}}.
-- Return ONLY a valid JSON object on a single line. No explanation, no markdown, no code block.
-- IMPORTANT: You must write the JSON as the very last thing in your response. End your entire response with the JSON object — do not add any text after it.
+- Prefer specific tags over parent/composite tags.
+- Don't map the same tag to two fields (exception: seq and ceq may share an equity tag).
+- Don't use a composite if its component is already mapped (e.g. if AccountsPayableCurrent → ap, don't reuse AccountsPayableAndOtherAccruedLiabilitiesCurrent elsewhere).
+- Sub-component fields (xpp, aco, lco, ivst, mib, mib_ni, pstk, drc, txp) → null when not separately tagged.
+- Cash flow fields (oancf, ivncf, fincf, capx, prstkc, scstkc, dvc, dvp, dltis, dltr) must come from cash flow statement tags only.
+- Outflow fields (capx, prstkc, dvc, dltr) are stored as POSITIVE magnitudes (Payments* tags are already positive).
+- ppent must be NET (PropertyPlantAndEquipmentNet, not Gross).
+- seq INCLUDES NCI — prefer StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest over plain StockholdersEquity when both exist.
+- Gains/losses on asset sales and goodwill impairments go to nopi or xsga, never sale.
+- A field may map to a LIST of tags when no aggregate exists. Valid only for: xsga, dp, xint, dlc.
+- FORBIDDEN tags (never use for any field):
+  * CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect (derived net change, not a line item)
+  * LiabilitiesAndStockholdersEquity (= total assets, not liabilities)
+  * StockRepurchasedDuringPeriodValue, TreasuryStockValueAcquiredCostMethod (equity statement, not cash flow)
 
-Example format:
-{{"at": "Assets", "sale": "Revenues", "ib": "NetIncomeLoss", "dp": ["Depreciation", "AmortizationOfIntangibleAssets"], "oancf": null}}
-
-JSON mapping:"""
+Return ONLY a JSON object."""
 
 
 # ---------------------------------------------------------------------------
