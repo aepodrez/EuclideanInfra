@@ -58,6 +58,17 @@ resource "aws_iam_role_policy" "edgar_filing_poller" {
         ]
       },
       {
+        Sid    = "S3ListFilings"
+        Effect = "Allow"
+        Action = ["s3:ListBucket"]
+        Resource = [aws_s3_bucket.pipeline_data.arn]
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["data-ingress/filings/*"]
+          }
+        }
+      },
+      {
         Sid    = "SQSPublish"
         Effect = "Allow"
         Action = ["sqs:SendMessage"]
