@@ -257,13 +257,15 @@ def build_prompt(tag_values: dict[str, float], form_type: str, industry: str) ->
         f"  {field}: {desc}" for field, desc in COMPUSTAT_FIELDS.items()
     )
 
-    industry_note = (
-        f"\nNote: This is a {industry} industry company. "
-        "Bank revenue (sale) = total interest income + non-interest income. "
-        "For banks, rect = net loans receivable. "
-        if industry in ("BANK", "FINANCIAL")
-        else ""
-    )
+    if industry in ("BANK", "FINANCIAL"):
+        industry_note = (
+            f"\nNote: This is a {industry} industry company. "
+            "sale = NET revenue = net interest income + noninterest income (NOT gross interest income). "
+            "rect = net loans and leases receivable. "
+            "cogs, invt, gp, and xsga should be null — banks have no inventory or cost of goods sold. "
+        )
+    else:
+        industry_note = ""
 
     return f"""You are mapping XBRL tags from a SEC {form_type} filing to Compustat financial data fields.
 Your goal is to reproduce the same field values that Compustat (WRDS) would assign for this filing.
@@ -529,10 +531,31 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         if dcash is not None:
             _check("CashFlow_total", oancf + ivncf + fincf + exre, dcash)
 
+    # --- Effective tax rate sanity (non-bank) ---
+    # txt / pi should be between -10% and 60%; outside that range suggests a misassigned tag
+    if industry not in ("BANK", "FINANCIAL"):
+        pi_v  = values.get("pi",  0.0)
+        txt_v = values.get("txt", 0.0)
+        if pi_v and txt_v:
+            etr = txt_v / pi_v
+            if not (-0.10 <= etr <= 0.60):
+                residuals["TaxRate_sanity"] = abs(etr)
+
+    # --- Cash flow sign checks ---
+    # oancf should be positive, ivncf negative, capx positive
+    oancf_v = values.get("oancf", None)
+    ivncf_v = values.get("ivncf", None)
+    capx_v  = values.get("capx",  None)
+    if oancf_v is not None and oancf_v < 0:
+        residuals["Sign_oancf"] = abs(oancf_v)
+    if ivncf_v is not None and ivncf_v > 0:
+        residuals["Sign_ivncf"] = abs(ivncf_v)
+    if capx_v is not None and capx_v < 0:
+        residuals["Sign_capx"] = abs(capx_v)
+
     # --- Bank: revenue identities ---
-    # For banks: sale = net revenue = net interest income + noninterest income
-    #            net interest income = revt_interest - xint
-    # So: sale ≈ (revt_interest - xint) + revt_noninterest
+    # sale = net interest income + noninterest income
+    # net interest income = revt_interest - xint
     if industry == "BANK":
         revt_interest    = values.get("revt_interest",    0.0)
         revt_noninterest = values.get("revt_noninterest", 0.0)
@@ -542,14 +565,6 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         if revt_interest or xint:
             residuals["Bank_NetInterestIncome"] = _pct_err(net_interest, sale_v - revt_noninterest) if (sale_v and revt_noninterest) else net_interest
         _check("Bank_Revenue_partition", sale_v, net_interest + revt_noninterest)
-
-    # --- Insurance: Net Premiums = Direct + Assumed - Ceded ---
-    if industry == "INSURANCE":
-        prem_net     = values.get("prem_net",     0.0)
-        prem_gross   = values.get("prem_gross",   0.0)
-        prem_assumed = values.get("prem_assumed", 0.0)
-        prem_ceded   = values.get("prem_ceded",   0.0)
-        _check("Insurance_NetPremiums", prem_net, prem_gross + prem_assumed - prem_ceded)
 
     return residuals
 
