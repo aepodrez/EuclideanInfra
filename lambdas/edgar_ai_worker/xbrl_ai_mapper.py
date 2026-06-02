@@ -312,6 +312,15 @@ _MODEL_INFERENCE_CONFIG = {
 # so falling back on them wastes money without improving data quality.
 _FALLBACK_TRIGGER_CHECKS = {"BalanceSheet", "NetIncome", "GrossProfit", "Liabilities_total"}
 
+# Priority-ordered XBRL tags for the net change in cash this period.
+# The first tag found in the filing's facts is used as the reference for CashFlow_total.
+_DCASH_TAGS = [
+    "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+    "CashAndCashEquivalentsPeriodIncreaseDecrease",
+    "CashAndCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect",
+    "NetCashProvidedByUsedInContinuingOperations",
+]
+
 # If the fast model's max residual on trigger checks exceeds this, fall back to R1
 _FALLBACK_THRESHOLD = 0.15
 
@@ -397,7 +406,7 @@ def _pct_err(actual: float, expected: float) -> float:
     return abs(actual - expected) / abs(expected)
 
 
-def validate_anchors(values: dict[str, float], industry: str = "GENERAL") -> dict[str, float]:
+def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts: dict[str, float] | None = None) -> dict[str, float]:
     """Returns {anchor_name: relative_residual}. 0 = perfect, >0.05 = suspect."""
     residuals: dict[str, float] = {}
 
@@ -468,13 +477,15 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL") -> dic
     if not pstk:
         _check("NetIncome_attribution", ni, ib - mib_ni)
 
-    # --- Cash Flow total (reported as sum, not residual) ---
+    # --- Cash Flow total: component sum should equal reported net change in cash ---
     oancf = values.get("oancf", 0.0)
     ivncf = values.get("ivncf", 0.0)
     fincf = values.get("fincf", 0.0)
     exre  = values.get("exre",  0.0)
-    if oancf or ivncf or fincf:
-        residuals["CashFlow_componentSum"] = oancf + ivncf + fincf + exre
+    if (oancf or ivncf or fincf) and facts:
+        dcash = next((facts[t] for t in _DCASH_TAGS if t in facts), None)
+        if dcash is not None:
+            _check("CashFlow_total", oancf + ivncf + fincf + exre, dcash)
 
     # --- Bank: revenue identities ---
     if industry == "BANK":
@@ -540,7 +551,7 @@ def map_filing(
     values = extract_values(facts, mapping)
 
     # 6. Validate
-    residuals = validate_anchors(values, industry)
+    residuals = validate_anchors(values, industry, facts=facts)
     max_residual = _max_relative_residual(residuals)
     log.info("Fast model residuals (max=%.3f): %s", max_residual,
              {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
@@ -550,7 +561,7 @@ def map_filing(
         log.info("Residual %.3f > %.2f — falling back to %s", max_residual, _FALLBACK_THRESHOLD, _BEDROCK_MODEL_STRONG)
         mapping   = invoke_bedrock(prompt, bedrock_client, model_id=_BEDROCK_MODEL_STRONG)
         values    = extract_values(facts, mapping)
-        residuals = validate_anchors(values, industry)
+        residuals = validate_anchors(values, industry, facts=facts)
         model_used = _BEDROCK_MODEL_STRONG
         log.info("Strong model residuals: %s", {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
 
