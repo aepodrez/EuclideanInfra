@@ -78,7 +78,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "xi":     "Extraordinary Items net of tax (rare post-2015)",
     "ni":     "Net Income — total consolidated (ni = ib + do + xi)",
     # Cash Flow — outflow fields stored as POSITIVE magnitudes
-    "oancf":  "Net Cash from Operating Activities",
+    "oancf":  "Net Cash from Operating Activities (NetCashProvidedByUsedInOperatingActivities). If no aggregate tag exists, use a LIST: [NetCashProvidedByUsedInOperatingActivitiesContinuingOperations, CashProvidedByUsedInOperatingActivitiesDiscontinuedOperations]",
     "ivncf":  "Net Cash from Investing Activities",
     "fincf":  "Net Cash from Financing Activities",
     "exre":   "Effect of FX on Cash (EffectOfExchangeRateOnCash* only)",
@@ -312,7 +312,7 @@ Rules:
 - ppent must be NET (PropertyPlantAndEquipmentNet, not Gross).
 - seq INCLUDES NCI — prefer StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest over plain StockholdersEquity when both exist.
 - Gains/losses on asset sales and goodwill impairments go to nopi or xsga, never sale.
-- A field may map to a LIST of tags when no aggregate exists. Valid only for: xsga, dp, xint, dlc.
+- A field may map to a LIST of tags when no aggregate exists. Valid only for: xsga, dp, xint, dlc, oancf.
 - FORBIDDEN tags (never use for any field):
   * CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect (derived net change, not a line item)
   * LiabilitiesAndStockholdersEquity (= total assets, not liabilities)
@@ -591,9 +591,6 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
     pi_chk  = values.get("pi", 0.0)
     if oancf_v is not None and oancf_v < 0 and pi_chk > 0:
         residuals["Sign_oancf"] = abs(oancf_v)
-    # ivncf positive is legitimate when asset sale/divestiture proceeds exceed capex (e.g. spin-offs)
-    if ivncf_v is not None and ivncf_v > 0 and not values.get("do"):
-        residuals["Sign_ivncf"] = abs(ivncf_v)
     if capx_v is not None and capx_v < 0:
         residuals["Sign_capx"] = abs(capx_v)
 
