@@ -299,7 +299,7 @@ JSON mapping:"""
 # Model configuration
 # ---------------------------------------------------------------------------
 _OPENROUTER_API_URL   = "https://openrouter.ai/api/v1/chat/completions"
-_OPENROUTER_MODEL     = "moonshotai/kimi-k2.6"
+_OPENROUTER_MODEL     = "moonshotai/kimi-k2.6:free"
 
 # Priority-ordered XBRL tags for the net change in cash this period.
 _DCASH_TAGS = [
