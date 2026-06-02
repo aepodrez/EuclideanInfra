@@ -257,16 +257,15 @@ def build_prompt(tag_values: dict[str, float], form_type: str, industry: str, si
         f"  {field}: {desc}" for field, desc in COMPUSTAT_FIELDS.items()
     )
 
-    sic_note = f" (SIC {sic})" if sic else ""
     if industry in ("BANK", "FINANCIAL"):
         industry_note = (
-            f"\nNote: This is a {industry} industry company{sic_note}. "
+            f"\nNote: This is a {industry} company (SIC {sic}). "
             "sale = NET revenue = net interest income + noninterest income (NOT gross interest income). "
             "rect = net loans and leases receivable. "
             "cogs, invt, gp, and xsga should be null — banks have no inventory or cost of goods sold. "
         )
     else:
-        industry_note = f"\nNote: This is a {industry} industry company{sic_note}." if sic else ""
+        industry_note = f"\nNote: SIC {sic}." if sic else ""
 
     return f"""You are mapping XBRL tags from a SEC {form_type} filing to Compustat financial data fields.
 Your goal is to reproduce the same field values that Compustat (WRDS) would assign for this filing.
