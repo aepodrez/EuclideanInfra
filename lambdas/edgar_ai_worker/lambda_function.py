@@ -1,8 +1,9 @@
 """Edgar AI Worker Lambda.
 
 Triggered by SQS. Each message describes one new SEC filing (10-K or 10-Q).
-Fetches XBRL facts, maps them to Compustat fields via Bedrock, validates
-accounting identities, and writes a single-row parquet to S3.
+Fetches XBRL facts, maps them to Compustat fields via Nova Lite (fast) and
+Kimi K2.6 via OpenRouter (strong fallback), validates accounting identities,
+and writes a single-row parquet to S3.
 
 SQS message format:
     {
