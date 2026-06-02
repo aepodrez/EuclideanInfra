@@ -298,15 +298,34 @@ JSON mapping:"""
 # ---------------------------------------------------------------------------
 # Bedrock invocation
 # ---------------------------------------------------------------------------
-_BEDROCK_MODEL = "us.deepseek.r1-v1:0"
+_BEDROCK_MODEL_FAST   = "us.amazon.nova-lite-v1:0"
+_BEDROCK_MODEL_STRONG = "us.deepseek.r1-v1:0"
+
+_MODEL_INFERENCE_CONFIG = {
+    _BEDROCK_MODEL_FAST:   {"maxTokens": 2048,  "temperature": 0},
+    _BEDROCK_MODEL_STRONG: {"maxTokens": 16000, "temperature": 0},
+}
+
+# Residual names that are absolute values (not relative %) — excluded from fallback threshold
+_ABSOLUTE_RESIDUAL_CHECKS = {"CashFlow_componentSum", "Bank_NetInterestIncome"}
+
+# If the fast model's max relative residual exceeds this, fall back to the strong model
+_FALLBACK_THRESHOLD = 0.15
 
 
-def invoke_bedrock(prompt: str, bedrock_client) -> dict[str, Optional[str]]:
+def _max_relative_residual(residuals: dict) -> float:
+    vals = [v for k, v in residuals.items()
+            if k not in _ABSOLUTE_RESIDUAL_CHECKS and isinstance(v, float)]
+    return max(vals, default=0.0)
+
+
+def invoke_bedrock(prompt: str, bedrock_client, model_id: str = _BEDROCK_MODEL_STRONG) -> dict[str, Optional[str]]:
     """Calls Bedrock and returns the parsed {field: xbrl_tag_or_null} mapping."""
+    inference_config = _MODEL_INFERENCE_CONFIG.get(model_id, {"maxTokens": 4096, "temperature": 0})
     response = bedrock_client.converse(
-        modelId=_BEDROCK_MODEL,
+        modelId=model_id,
         messages=[{"role": "user", "content": [{"text": prompt}]}],
-        inferenceConfig={"maxTokens": 16000, "temperature": 0},
+        inferenceConfig=inference_config,
     )
     # R1 returns a reasoningContent block before the text block — find the text block
     text = ""
@@ -509,17 +528,28 @@ def map_filing(
     # 3. Industry
     industry = classify_industry(sic)
 
-    # 4. AI mapping
+    # 4. AI mapping — fast model first, fall back to strong model if residuals are high
     prompt = build_prompt(facts, form_type, industry)
-    mapping = invoke_bedrock(prompt, bedrock_client)
-    log.info("AI mapping produced %d field assignments", sum(1 for v in mapping.values() if v))
+    mapping = invoke_bedrock(prompt, bedrock_client, model_id=_BEDROCK_MODEL_FAST)
+    log.info("Fast model (%s) produced %d field assignments", _BEDROCK_MODEL_FAST, sum(1 for v in mapping.values() if v))
 
     # 5. Extract numeric values
     values = extract_values(facts, mapping)
 
     # 6. Validate
     residuals = validate_anchors(values, industry)
-    log.info("anchor residuals: %s", {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
+    max_residual = _max_relative_residual(residuals)
+    log.info("Fast model residuals (max=%.3f): %s", max_residual,
+             {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
+
+    model_used = _BEDROCK_MODEL_FAST
+    if max_residual > _FALLBACK_THRESHOLD:
+        log.info("Residual %.3f > %.2f — falling back to %s", max_residual, _FALLBACK_THRESHOLD, _BEDROCK_MODEL_STRONG)
+        mapping   = invoke_bedrock(prompt, bedrock_client, model_id=_BEDROCK_MODEL_STRONG)
+        values    = extract_values(facts, mapping)
+        residuals = validate_anchors(values, industry)
+        model_used = _BEDROCK_MODEL_STRONG
+        log.info("Strong model residuals: %s", {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
 
     # 7. Build output row
     row: dict = {
@@ -532,5 +562,6 @@ def map_filing(
     row.update(values)
     row["_anchor_residuals"] = json.dumps(residuals)
     row["_ai_mapping"]       = json.dumps(mapping)
+    row["_model_used"]       = model_used
 
     return row
