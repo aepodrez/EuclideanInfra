@@ -396,7 +396,7 @@ def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
     msg = body["choices"][0]["message"]
     reasoning = msg.get("reasoning") or ""
     if reasoning:
-        log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:2000])
+        log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:8000])
     text = (msg.get("content") or reasoning or "").strip()
     return model, _parse_llm_json(text)
 
