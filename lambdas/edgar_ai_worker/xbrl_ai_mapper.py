@@ -328,7 +328,7 @@ def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
     payload = json.dumps({
         "model": _OPENROUTER_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 4096,
+        "max_tokens": 16000,
         "temperature": 0,
     }).encode()
 
@@ -348,12 +348,10 @@ def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 body = json.loads(resp.read())
-            break
         except urllib.error.HTTPError as exc:
             if attempt == 5:
                 raise
             if exc.code == 429:
-                # Read Retry-After if present; otherwise use long exponential backoff
                 retry_after = exc.headers.get("Retry-After") if exc.headers else None
                 wait = int(retry_after) if retry_after and retry_after.isdigit() else 30 * attempt
                 try:
@@ -365,21 +363,30 @@ def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
                 wait = 5 * attempt
                 log.warning("OpenRouter attempt %d failed (HTTP %d), retrying in %ds", attempt, exc.code, wait)
             time.sleep(wait)
+            continue
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             if attempt == 5:
                 raise
             wait = 5 * attempt
             log.warning("OpenRouter attempt %d failed (%s), retrying in %ds", attempt, exc, wait)
             time.sleep(wait)
+            continue
 
-    msg = body["choices"][0]["message"]
-    reasoning = msg.get("reasoning") or ""
-    if reasoning:
-        log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:2000])
-    # Paid Kimi K2.6 returns content=null when it uses the reasoning field;
-    # the JSON answer is embedded at the end of the reasoning text.
-    text = (msg.get("content") or reasoning or "").strip()
-    return _parse_llm_json(text)
+        msg = body["choices"][0]["message"]
+        reasoning = msg.get("reasoning") or ""
+        if reasoning:
+            log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:2000])
+        # Paid Kimi K2.6 returns content=null; JSON answer is at the end of reasoning.
+        text = (msg.get("content") or reasoning or "").strip()
+        try:
+            return _parse_llm_json(text)
+        except ValueError:
+            if attempt == 5:
+                raise
+            log.warning("Kimi attempt %d returned no JSON (reasoning %d chars) — retrying", attempt, len(reasoning))
+            time.sleep(5 * attempt)
+
+    raise RuntimeError("_invoke_kimi exhausted retries without a valid JSON response")
 
 
 # ---------------------------------------------------------------------------
