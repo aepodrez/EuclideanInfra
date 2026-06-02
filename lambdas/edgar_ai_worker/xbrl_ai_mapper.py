@@ -372,7 +372,11 @@ def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
             log.warning("OpenRouter attempt %d failed (%s), retrying in %ds", attempt, exc, wait)
             time.sleep(wait)
 
-    text = body["choices"][0]["message"]["content"].strip()
+    msg = body["choices"][0]["message"]
+    reasoning = msg.get("reasoning") or ""
+    if reasoning:
+        log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:2000])
+    text = msg.get("content", "").strip()
     return _parse_llm_json(text)
 
 
