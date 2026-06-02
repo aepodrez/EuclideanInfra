@@ -574,13 +574,13 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
             _check("CashFlow_total", oancf + ivncf + fincf + exre, dcash)
 
     # --- Effective tax rate sanity (non-bank) ---
-    # txt / pi should be between -10% and 60%; outside that range suggests a misassigned tag
+    # txt / pi should be 0–60% for profitable companies; tax benefits on loss years are normal
     if industry not in ("BANK", "FINANCIAL"):
         pi_v  = values.get("pi",  0.0)
         txt_v = values.get("txt", 0.0)
-        if pi_v and txt_v:
+        if pi_v and pi_v > 0 and txt_v:
             etr = txt_v / pi_v
-            if not (-0.10 <= etr <= 0.60):
+            if not (0.0 <= etr <= 0.60):
                 residuals["TaxRate_sanity"] = abs(etr)
 
     # --- Cash flow sign checks ---
@@ -591,7 +591,8 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
     pi_chk  = values.get("pi", 0.0)
     if oancf_v is not None and oancf_v < 0 and pi_chk > 0:
         residuals["Sign_oancf"] = abs(oancf_v)
-    if ivncf_v is not None and ivncf_v > 0:
+    # ivncf positive is legitimate when asset sale/divestiture proceeds exceed capex (e.g. spin-offs)
+    if ivncf_v is not None and ivncf_v > 0 and not values.get("do"):
         residuals["Sign_ivncf"] = abs(ivncf_v)
     if capx_v is not None and capx_v < 0:
         residuals["Sign_capx"] = abs(capx_v)
