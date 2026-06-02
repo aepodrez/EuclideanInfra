@@ -268,6 +268,9 @@ def build_prompt(tag_values: dict[str, float], form_type: str, industry: str, si
         industry_note = (
             f"\nNote: {sic_label} ({industry}). "
             "sale = NET revenue = net interest income + noninterest income (NOT gross interest income). "
+            "Always map sale — it equals revt_interest - xint + revt_noninterest. "
+            "If no aggregate tag exists, use a LIST: [InterestAndDividendIncomeOperating (or equivalent), NoninterestIncome] and subtract xint via the identity. "
+            "Prefer tags like RevenuesNetOfInterestExpense, RevenueFromContractWithCustomerExcludingAssessedTax, or InterestIncomeExpenseNet + NoninterestIncome if present. "
             "rect = net loans and leases receivable. "
             "cogs, invt, gp, and xsga should be null — banks have no inventory or cost of goods sold. "
         )
@@ -484,6 +487,12 @@ def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str | li
         if lt and lct:
             values["lt_noncurrent"] = lt - lct
 
+    # Derive seq = ceq when sole equity class is common (no preferred stock, no NCI balance).
+    # Covers companies where XBRL only tags StockholdersEquity (parent-only) = ceq = seq.
+    if values.get("seq") is None and values.get("ceq") is not None:
+        if not values.get("pstk") and not values.get("mib"):
+            values["seq"] = values["ceq"]
+
     # Derive ceq = seq - pstk for companies with preferred stock.
     # Fires when: (a) AI left ceq null, or (b) AI mapped ceq to same tag as seq.
     # In both cases, common equity = total equity minus preferred stock carrying value.
@@ -603,8 +612,9 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         xint             = values.get("xint",             0.0)
         sale_v           = values.get("sale",             0.0)
         net_interest     = revt_interest - xint
-        if revt_interest or xint:
-            residuals["Bank_NetInterestIncome"] = _pct_err(net_interest, sale_v - revt_noninterest) if (sale_v and revt_noninterest) else net_interest
+        # Only check net interest income identity when all three revenue components are mapped
+        if sale_v and revt_interest and revt_noninterest:
+            _check("Bank_NetInterestIncome", net_interest, sale_v - revt_noninterest)
         _check("Bank_Revenue_partition", sale_v, net_interest + revt_noninterest)
 
     return residuals
