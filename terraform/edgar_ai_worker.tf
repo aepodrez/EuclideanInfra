@@ -63,6 +63,14 @@ resource "aws_iam_role_policy" "edgar_ai_worker" {
         ]
       },
       {
+        Sid    = "SecretsManagerOpenRouter"
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:euclidean/openrouter-api-key*"
+        ]
+      },
+      {
         Sid    = "SQSConsume"
         Effect = "Allow"
         Action = [
@@ -90,7 +98,8 @@ resource "aws_lambda_function" "edgar_ai_worker" {
 
   environment {
     variables = {
-      S3_BUCKET = aws_s3_bucket.pipeline_data.id
+      S3_BUCKET              = aws_s3_bucket.pipeline_data.id
+      OPENROUTER_SECRET_NAME = "euclidean/openrouter-api-key"
     }
   }
 

@@ -296,20 +296,14 @@ JSON mapping:"""
 
 
 # ---------------------------------------------------------------------------
-# Bedrock invocation
+# Model configuration
 # ---------------------------------------------------------------------------
-_BEDROCK_MODEL_FAST   = "us.amazon.nova-lite-v1:0"
-_BEDROCK_MODEL_STRONG = "us.deepseek.r1-v1:0"
+_BEDROCK_MODEL_FAST      = "us.amazon.nova-lite-v1:0"           # fast tier — Bedrock Nova Lite
+_OPENROUTER_API_URL      = "https://openrouter.ai/api/v1/chat/completions"
+_OPENROUTER_MODEL_STRONG = "moonshotai/kimi-k2.6:free"           # strong tier — OpenRouter free
 
-_MODEL_INFERENCE_CONFIG = {
-    _BEDROCK_MODEL_FAST:   {"maxTokens": 2048,  "temperature": 0},
-    _BEDROCK_MODEL_STRONG: {"maxTokens": 16000, "temperature": 0},
-}
-
-# Only these checks trigger an R1 fallback — checks where R1 actually resolves the
-# residual. Partition checks (LiabilitiesCurrent, AssetsCurrent, Equity_decomposition)
-# and NetIncome_attribution are structural XBRL data gaps that R1 cannot fix either,
-# so falling back on them wastes money without improving data quality.
+# Only these checks trigger a strong-model fallback — checks where Kimi actually
+# resolves the residual. Partition checks are structural XBRL data gaps.
 _FALLBACK_TRIGGER_CHECKS = {"BalanceSheet", "NetIncome", "GrossProfit", "Liabilities_total"}
 
 # Priority-ordered XBRL tags for the net change in cash this period.
@@ -321,10 +315,10 @@ _DCASH_TAGS = [
     "NetCashProvidedByUsedInContinuingOperations",
 ]
 
-# If the fast model's max residual on trigger checks exceeds this, fall back to R1.
-# 10.0 = only fall back on catastrophic mismatches (identity off by >1000%).
-# Calibrated to keep full-universe backfill cost under $50 at ~11% R1 usage.
-_FALLBACK_THRESHOLD = 10.0
+# Strong model (Kimi K2.6) is free via OpenRouter, so threshold is set aggressively.
+# 1.0 = fall back when identity is off by >100% — catches real tag errors.
+# ~38% fallback rate against 382-filing sample.
+_FALLBACK_THRESHOLD = 1.0
 
 
 def _max_relative_residual(residuals: dict) -> float:
@@ -333,15 +327,26 @@ def _max_relative_residual(residuals: dict) -> float:
     return max(vals, default=0.0)
 
 
-def invoke_bedrock(prompt: str, bedrock_client, model_id: str = _BEDROCK_MODEL_STRONG) -> dict[str, Optional[str]]:
-    """Calls Bedrock and returns the parsed {field: xbrl_tag_or_null} mapping."""
-    inference_config = _MODEL_INFERENCE_CONFIG.get(model_id, {"maxTokens": 4096, "temperature": 0})
+def _parse_llm_json(text: str) -> dict[str, Optional[str]]:
+    """Extract and normalise the JSON mapping from an LLM response string."""
+    json_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not json_match:
+        raise ValueError(f"No JSON object found in LLM response: {text[:200]}")
+    raw = json.loads(json_match.group(0))
+    return {
+        field: (raw[field] if raw.get(field) else None)
+        for field in COMPUSTAT_FIELDS
+        if field in raw
+    }
+
+
+def _invoke_bedrock_fast(prompt: str, bedrock_client) -> dict[str, Optional[str]]:
+    """Call Nova Lite via Bedrock converse API."""
     response = bedrock_client.converse(
-        modelId=model_id,
+        modelId=_BEDROCK_MODEL_FAST,
         messages=[{"role": "user", "content": [{"text": prompt}]}],
-        inferenceConfig=inference_config,
+        inferenceConfig={"maxTokens": 2048, "temperature": 0},
     )
-    # R1 returns a reasoningContent block before the text block — find the text block
     text = ""
     for block in response["output"]["message"]["content"]:
         if "text" in block:
@@ -349,19 +354,44 @@ def invoke_bedrock(prompt: str, bedrock_client, model_id: str = _BEDROCK_MODEL_S
             break
     if not text:
         raise ValueError(f"No text block in Bedrock response: {response['output']['message']['content']}")
+    return _parse_llm_json(text)
 
-    # Extract JSON — the model sometimes wraps in markdown despite instructions
-    json_match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not json_match:
-        raise ValueError(f"No JSON object found in Bedrock response: {text[:200]}")
 
-    raw = json.loads(json_match.group(0))
-    # Normalise: keep only known fields, coerce None
-    return {
-        field: (raw[field] if raw.get(field) else None)
-        for field in COMPUSTAT_FIELDS
-        if field in raw
-    }
+def _invoke_openrouter_strong(prompt: str, api_key: str) -> dict[str, Optional[str]]:
+    """Call Kimi K2.6 via OpenRouter (OpenAI-compatible chat completions)."""
+    payload = json.dumps({
+        "model": _OPENROUTER_MODEL_STRONG,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 16000,
+        "temperature": 0,
+    }).encode()
+
+    req = urllib.request.Request(
+        _OPENROUTER_API_URL,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "HTTP-Referer": "https://github.com/aepodrez/EuclideanInfra",
+            "X-Title": "Euclidean XBRL Mapper",
+        },
+        method="POST",
+    )
+
+    for attempt in range(1, 4):
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                body = json.loads(resp.read())
+            break
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt == 3:
+                raise
+            wait = 5 * attempt
+            log.warning("OpenRouter attempt %d failed (%s), retrying in %ds", attempt, exc, wait)
+            time.sleep(wait)
+
+    text = body["choices"][0]["message"]["content"].strip()
+    return _parse_llm_json(text)
 
 
 # ---------------------------------------------------------------------------
@@ -491,11 +521,14 @@ def map_filing(
     ticker: str,
     sic: Optional[str] = None,
     bedrock_client=None,
+    openrouter_api_key: str = "",
 ) -> dict:
     """
-    Fetch XBRL facts for one filing, ask Bedrock to map tags to Compustat fields,
+    Fetch XBRL facts for one filing, map tags to Compustat fields via LLM,
     validate accounting identities, and return a flat row dict.
 
+    Fast path: Nova Lite via Bedrock.
+    Fallback: Kimi K2.6 via OpenRouter (free tier) when residuals exceed threshold.
     The returned dict can be written directly as a single-row parquet file.
     """
     cik_padded = str(int(cik)).zfill(10)
@@ -515,10 +548,10 @@ def map_filing(
     # 3. Industry
     industry = classify_industry(sic)
 
-    # 4. AI mapping — fast model first, fall back to strong model if residuals are high
+    # 4. Fast model (Nova Lite via Bedrock)
     prompt = build_prompt(facts, form_type, industry)
-    mapping = invoke_bedrock(prompt, bedrock_client, model_id=_BEDROCK_MODEL_FAST)
-    log.info("Fast model (%s) produced %d field assignments", _BEDROCK_MODEL_FAST, sum(1 for v in mapping.values() if v))
+    mapping = _invoke_bedrock_fast(prompt, bedrock_client)
+    log.info("Fast model produced %d field assignments", sum(1 for v in mapping.values() if v))
 
     # 5. Extract numeric values
     values = extract_values(facts, mapping)
@@ -531,11 +564,12 @@ def map_filing(
 
     model_used = _BEDROCK_MODEL_FAST
     if max_residual > _FALLBACK_THRESHOLD:
-        log.info("Residual %.3f > %.2f — falling back to %s", max_residual, _FALLBACK_THRESHOLD, _BEDROCK_MODEL_STRONG)
-        mapping   = invoke_bedrock(prompt, bedrock_client, model_id=_BEDROCK_MODEL_STRONG)
+        log.info("Residual %.3f > %.2f — falling back to %s",
+                 max_residual, _FALLBACK_THRESHOLD, _OPENROUTER_MODEL_STRONG)
+        mapping   = _invoke_openrouter_strong(prompt, openrouter_api_key)
         values    = extract_values(facts, mapping)
         residuals = validate_anchors(values, industry, facts=facts)
-        model_used = _BEDROCK_MODEL_STRONG
+        model_used = _OPENROUTER_MODEL_STRONG
         log.info("Strong model residuals: %s", {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
 
     # 7. Build output row
