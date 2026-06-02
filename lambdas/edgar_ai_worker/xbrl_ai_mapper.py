@@ -62,11 +62,11 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "revt_noninterest": "Non-Interest Income — bank fees, trading gains, service charges (banks only)",
     "cogs":   "Cost of Goods Sold / Cost of Revenue",
     "gp":     "Gross Profit",
-    "xsga":   "Selling General & Administrative Expense",
+    "xsga":   "Selling General & Administrative Expense — prefer a combined SGA tag; if none exists, use a LIST of the selling and G&A component tags (e.g. [\"SellingAndMarketingExpense\", \"GeneralAndAdministrativeExpense\"])",
     "xrd":    "Research & Development Expense",
     "xad":    "Advertising Expense",
-    "xint":   "Interest Expense",
-    "dp":     "Depreciation & Amortization",
+    "xint":   "Interest Expense — prefer a combined interest expense tag; if none exists, use a LIST of component tags",
+    "dp":     "Depreciation & Amortization — prefer a combined D&A tag (DepreciationDepletionAndAmortization); if none exists, use a LIST of component tags (e.g. [\"Depreciation\", \"AmortizationOfIntangibleAssets\"])",
     "oiadp":  "Operating Income / Loss (AFTER D&A)",
     "nopi":   "Non-operating Income (Expense) net",
     "pi":     "Pre-tax Income (Income Before Income Taxes)",
@@ -266,6 +266,8 @@ def build_prompt(tag_values: dict[str, float], form_type: str, industry: str) ->
     )
 
     return f"""You are mapping XBRL tags from a SEC {form_type} filing to Compustat financial data fields.
+Your goal is to reproduce the same field values that Compustat (WRDS) would assign for this filing.
+When choosing between candidate tags, pick the one that best matches Compustat's documented field definition — not just the closest label match.
 
 XBRL tags present in this filing (tag: USD value):
 {tag_lines}
@@ -287,10 +289,11 @@ Rules:
 - Do NOT assign a composite/parent tag to one field if a component of that composite is already assigned to another field (e.g. if AccountsPayableCurrent is assigned to ap, do not also assign AccountsPayableAndOtherAccruedLiabilitiesCurrent to aco or xacc — pick the more specific standalone tag instead).
 - For cash flow fields (oancf, ivncf, fincf, capx, prstkc, scstkc, dvc, dvp, dltis, dltr), only use tags that appear in the cash flow statement — never use equity statement or balance sheet tags.
 - NEVER assign CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect to any field — it is the total net change in cash (a derived sum), not a standalone line item.
+- A field may map to a LIST of XBRL tags when no single aggregate tag exists and the field is a known sum of components. Only use a list when necessary — prefer a single tag. Valid multi-tag fields: xsga, dp, xint, dlc. Example: {{"dp": ["Depreciation", "AmortizationOfIntangibleAssets"]}}.
 - Return ONLY a valid JSON object on a single line. No explanation, no markdown, no code block.
 
 Example format:
-{{"at": "Assets", "sale": "Revenues", "ib": "NetIncomeLoss", "oancf": null}}
+{{"at": "Assets", "sale": "Revenues", "ib": "NetIncomeLoss", "dp": ["Depreciation", "AmortizationOfIntangibleAssets"], "oancf": null}}
 
 JSON mapping:"""
 
@@ -311,17 +314,29 @@ _DCASH_TAGS = [
 ]
 
 
-def _parse_llm_json(text: str) -> dict[str, Optional[str]]:
-    """Extract and normalise the JSON mapping from an LLM response string."""
+def _parse_llm_json(text: str) -> dict[str, Optional[str | list[str]]]:
+    """Extract and normalise the JSON mapping from an LLM response string.
+
+    Values may be a single tag string, a list of tag strings (for sum fields),
+    or null.
+    """
     json_match = re.search(r"\{.*\}", text, re.DOTALL)
     if not json_match:
         raise ValueError(f"No JSON object found in LLM response: {text[:200]}")
     raw = json.loads(json_match.group(0))
-    return {
-        field: (raw[field] if raw.get(field) else None)
-        for field in COMPUSTAT_FIELDS
-        if field in raw
-    }
+    result: dict[str, Optional[str | list[str]]] = {}
+    for field in COMPUSTAT_FIELDS:
+        if field not in raw:
+            continue
+        val = raw[field]
+        if not val:
+            result[field] = None
+        elif isinstance(val, list):
+            tags = [t for t in val if t]
+            result[field] = tags if len(tags) > 1 else (tags[0] if tags else None)
+        else:
+            result[field] = val
+    return result
 
 
 def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
@@ -393,11 +408,21 @@ def _invoke_kimi(prompt: str, api_key: str) -> tuple[str, dict[str, Optional[str
 # ---------------------------------------------------------------------------
 # Value extraction + anchor validation
 # ---------------------------------------------------------------------------
-def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str]]) -> dict[str, float]:
+def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str | list[str]]]) -> dict[str, float]:
     """Apply the AI mapping to get numeric values for each Compustat field."""
     values: dict[str, float] = {}
     for field, tag in mapping.items():
-        if tag and tag in facts:
+        if not tag:
+            continue
+        if isinstance(tag, list):
+            total = sum(facts[t] for t in tag if t in facts)
+            found = [t for t in tag if t in facts]
+            if found:
+                values[field] = total
+                if len(found) < len(tag):
+                    missing = [t for t in tag if t not in facts]
+                    log.warning("Multi-tag %s: missing tags %s", field, missing)
+        elif tag in facts:
             values[field] = facts[tag]
 
     # Derive lt = at - seq when Liabilities is not directly tagged in XBRL.
