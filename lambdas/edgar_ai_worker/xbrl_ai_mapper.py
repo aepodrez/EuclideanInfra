@@ -73,7 +73,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "pi":     "Pre-tax Income from Continuing Operations",
     "txt":    "Income Tax Expense (Benefit) from Continuing Operations",
     "mib_ni": "Net Income attributable to NCI",
-    "ib":     "Income from Continuing Operations net of tax (ib = pi - txt)",
+    "ib":     "Income from Continuing Operations net of tax (ib = pi - txt). Use IncomeLossFromContinuingOperations (AFTER-TAX). NEVER use IncomeLossFromContinuingOperationsBeforeIncomeTaxes — that is pi, not ib.",
     "do":     "Discontinued Operations net of tax (IncomeLossFromDiscontinuedOperationsNetOfTax)",
     "xi":     "Extraordinary Items net of tax (rare post-2015)",
     "ni":     "Net Income — total consolidated (ni = ib + do + xi)",
@@ -584,11 +584,12 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
                 residuals["TaxRate_sanity"] = abs(etr)
 
     # --- Cash flow sign checks ---
-    # oancf should be positive, ivncf negative, capx positive
+    # oancf negative is only suspicious for profitable companies — pre-profit biotechs/E&P commonly run negative
     oancf_v = values.get("oancf", None)
     ivncf_v = values.get("ivncf", None)
     capx_v  = values.get("capx",  None)
-    if oancf_v is not None and oancf_v < 0:
+    pi_chk  = values.get("pi", 0.0)
+    if oancf_v is not None and oancf_v < 0 and pi_chk > 0:
         residuals["Sign_oancf"] = abs(oancf_v)
     if ivncf_v is not None and ivncf_v > 0:
         residuals["Sign_ivncf"] = abs(ivncf_v)
