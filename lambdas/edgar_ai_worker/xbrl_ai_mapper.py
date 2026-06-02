@@ -57,7 +57,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "re":   "Retained Earnings (Accumulated Deficit)",
     "mib":  "Minority / Noncontrolling Interest (balance sheet carrying value) — use NoncontrollingInterestMember or MinorityInterest tags. For limited partnerships using PartnersCapital/LimitedPartnersCapitalAccount, mib should be null (LP structures have no minority interest)",
     # Income Statement
-    "sale":          "Net Revenue / Net Sales (operating revenue only; for banks use total interest + noninterest income)",
+    "sale":          "Net Revenue / Net Sales (operating revenue only; for banks use the NET revenue line = net interest income + noninterest income, NOT gross interest income)",
     "revt_interest": "Interest Income — bank total interest and fee income on loans/securities (banks only)",
     "revt_noninterest": "Non-Interest Income — bank fees, trading gains, service charges (banks only)",
     "cogs":   "Cost of Goods Sold / Cost of Revenue",
@@ -530,14 +530,18 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
             _check("CashFlow_total", oancf + ivncf + fincf + exre, dcash)
 
     # --- Bank: revenue identities ---
+    # For banks: sale = net revenue = net interest income + noninterest income
+    #            net interest income = revt_interest - xint
+    # So: sale ≈ (revt_interest - xint) + revt_noninterest
     if industry == "BANK":
         revt_interest    = values.get("revt_interest",    0.0)
         revt_noninterest = values.get("revt_noninterest", 0.0)
         xint             = values.get("xint",             0.0)
         sale_v           = values.get("sale",             0.0)
+        net_interest     = revt_interest - xint
         if revt_interest or xint:
-            residuals["Bank_NetInterestIncome"] = revt_interest - xint
-        _check("Bank_Revenue_partition", sale_v, revt_interest + revt_noninterest)
+            residuals["Bank_NetInterestIncome"] = _pct_err(net_interest, sale_v - revt_noninterest) if (sale_v and revt_noninterest) else net_interest
+        _check("Bank_Revenue_partition", sale_v, net_interest + revt_noninterest)
 
     # --- Insurance: Net Premiums = Direct + Assumed - Ceded ---
     if industry == "INSURANCE":
