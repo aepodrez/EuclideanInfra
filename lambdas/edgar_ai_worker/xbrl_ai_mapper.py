@@ -306,7 +306,7 @@ JSON mapping:"""
 # ---------------------------------------------------------------------------
 _OPENROUTER_API_URL    = "https://openrouter.ai/api/v1/chat/completions"
 _OPENROUTER_MODEL_FREE = "moonshotai/kimi-k2.6:free"
-_OPENROUTER_MODEL_PAID = "moonshotai/kimi-k2.6"
+_OPENROUTER_MODEL_PAID = "moonshotai/kimi-k2.5"
 
 # Priority-ordered XBRL tags for the net change in cash this period.
 _DCASH_TAGS = [
@@ -353,12 +353,15 @@ def _parse_llm_json(text: str) -> dict[str, Optional[str | list[str]]]:
 
 def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
     """Single OpenRouter call. Returns (model_used, parsed_mapping). Raises on HTTP error."""
-    payload = json.dumps({
+    request_body: dict = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 16000,
         "temperature": 0,
-    }).encode()
+        "reasoning": {"enabled": False},
+        "response_format": {"type": "json_object"},
+    }
+    payload = json.dumps(request_body).encode()
 
     req = urllib.request.Request(
         _OPENROUTER_API_URL,
@@ -372,10 +375,11 @@ def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
         method="POST",
     )
 
+    response_body: dict = {}
     for attempt in range(1, 4):
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
-                body = json.loads(resp.read())
+                response_body = json.loads(resp.read())
             break
         except urllib.error.HTTPError as exc:
             if attempt == 3 or exc.code != 429:
@@ -395,7 +399,7 @@ def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
             log.warning("OpenRouter (%s) attempt %d failed (%s), retrying in %ds", model, attempt, exc, wait)
             time.sleep(wait)
 
-    msg = body["choices"][0]["message"]
+    msg = response_body["choices"][0]["message"]
     reasoning = msg.get("reasoning") or ""
     if reasoning:
         log.info("Kimi reasoning (%d chars): %s", len(reasoning), reasoning[:8000])
@@ -414,7 +418,7 @@ def _invoke_kimi(prompt: str, api_key: str) -> tuple[str, dict[str, Optional[str
     except ValueError:
         log.warning("Free tier returned no JSON — falling back to paid kimi-k2.6")
 
-    # Paid model sometimes omits the JSON from its reasoning on first attempt — retry once.
+    # Paid model (non-thinking) — content is always populated.
     for attempt in range(1, 3):
         try:
             return _call_openrouter(_OPENROUTER_MODEL_PAID, prompt, api_key)
