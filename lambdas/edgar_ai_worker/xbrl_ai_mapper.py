@@ -88,18 +88,16 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "dltr":   "Repayments of Long-term Debt",
 }
 
-# Accounting identities shown to the LLM as reasoning constraints
+# Accounting identities shown to the LLM as context — not targets to satisfy
 IDENTITY_PROMPT = """
-Accounting identities to guide your tag selection (all values in same currency units):
+These accounting identities will naturally hold when tags are mapped correctly.
+Do NOT choose a tag just to satisfy an identity — if no clearly matching tag exists, return null.
   1. at = lt + seq                              (Total Assets = Total Liabilities + Total Equity)
   2. gp = sale - cogs                           (Gross Profit = Revenue - Cost of Revenue)
   3. ib ≈ pi - txt - mib_ni                    (Net Income ≈ Pre-tax Income - Tax - NCI income)
   4. oancf + ivncf + fincf + exre ≈ change in cash balance (Cash Flow Statement)
-  5. seq = ceq + pstk + mib                    (Total Equity = Common + Preferred + NCI book value)
-  6. ni = ib - mib_ni                          (Parent Net Income = Total NI - NCI income)
-  7. sale = revt_interest + revt_noninterest   (Bank Total Revenue; banks only)
-
-Use these as sanity checks: if your chosen tags violate an identity badly, reconsider.
+  5. ni = ib - mib_ni                          (Parent Net Income = Total NI - NCI income)
+  6. sale = revt_interest + revt_noninterest   (Bank Total Revenue; banks only)
 """
 
 # ---------------------------------------------------------------------------
@@ -283,6 +281,8 @@ Compustat fields to map:
 Rules:
 - Choose the tag that BEST semantically matches the field description.
 - Prefer specific tags over generic parent tags when both are present.
+- Return null for any field where no XBRL tag clearly and specifically matches — null is always correct when the data is not present. Never assign a tag just to satisfy an accounting identity or to make a partition sum to its total.
+- Sub-component fields (xpp, aco, lco, ivst, mib, mib_ni, pstk, drc, txp, etc.) should be null when the filing does not report that specific line item with its own tag.
 - Do NOT map the same XBRL tag to more than one field (except seq and ceq may share StockholdersEquity tags if needed).
 - Do NOT assign a composite/parent tag to one field if a component of that composite is already assigned to another field (e.g. if AccountsPayableCurrent is assigned to ap, do not also assign AccountsPayableAndOtherAccruedLiabilitiesCurrent to aco or xacc — pick the more specific standalone tag instead).
 - For cash flow fields (oancf, ivncf, fincf, capx, prstkc, scstkc, dvc, dvp, dltis, dltr), only use tags that appear in the cash flow statement — never use equity statement or balance sheet tags.
@@ -420,40 +420,11 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
     seq = values.get("seq", 0.0)
     _check("BalanceSheet", at, lt + seq)
 
-    # --- Equity decomposition: seq = ceq + pstk + mib (all industries) ---
-    ceq  = values.get("ceq",  0.0)
-    pstk = values.get("pstk", 0.0)
-    mib  = values.get("mib",  0.0)
-    _check("Equity_decomposition", seq, ceq + pstk + mib)
-
     # --- Liabilities = Current + Noncurrent (not BANK/INSURANCE/FINANCIAL) ---
     if industry not in ("BANK", "INSURANCE", "FINANCIAL"):
         lct          = values.get("lct",          0.0)
         lt_noncurrent = values.get("lt_noncurrent", 0.0)
         _check("Liabilities_total", lt, lct + lt_noncurrent)
-
-    # --- Current Assets partition (not BANK/INSURANCE/FINANCIAL) ---
-    if industry not in ("BANK", "INSURANCE", "FINANCIAL"):
-        act = values.get("act", 0.0)
-        che = values.get("che", 0.0)
-        rect = values.get("rect", 0.0)
-        invt = values.get("invt", 0.0)
-        ivst = values.get("ivst", 0.0)
-        xpp  = values.get("xpp",  0.0)
-        aco  = values.get("aco",  0.0)
-        partition_sum = che + rect + invt + ivst + xpp + aco
-        _check("AssetsCurrent_partition", act, partition_sum)
-
-    # --- Current Liabilities partition (not BANK) ---
-    if industry != "BANK":
-        lct  = values.get("lct",  0.0)
-        ap   = values.get("ap",   0.0)
-        dlc  = values.get("dlc",  0.0)
-        drc  = values.get("drc",  0.0)
-        txp  = values.get("txp",  0.0)
-        xacc = values.get("xacc", 0.0)
-        lco  = values.get("lco",  0.0)
-        _check("LiabilitiesCurrent_partition", lct, ap + dlc + drc + txp + xacc + lco)
 
     # --- Gross Profit identity ---
     sale = values.get("sale", 0.0)
