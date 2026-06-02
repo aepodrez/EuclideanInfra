@@ -245,7 +245,7 @@ def _fmt_value(v: float) -> str:
     return f"{sign}{abs_v:.0f}"
 
 
-def build_prompt(tag_values: dict[str, float], form_type: str, industry: str) -> str:
+def build_prompt(tag_values: dict[str, float], form_type: str, industry: str, sic: Optional[str] = None) -> str:
     # Sort tags by absolute value descending so the most material items appear first
     sorted_tags = sorted(tag_values.items(), key=lambda x: abs(x[1]), reverse=True)
 
@@ -257,15 +257,16 @@ def build_prompt(tag_values: dict[str, float], form_type: str, industry: str) ->
         f"  {field}: {desc}" for field, desc in COMPUSTAT_FIELDS.items()
     )
 
+    sic_note = f" (SIC {sic})" if sic else ""
     if industry in ("BANK", "FINANCIAL"):
         industry_note = (
-            f"\nNote: This is a {industry} industry company. "
+            f"\nNote: This is a {industry} industry company{sic_note}. "
             "sale = NET revenue = net interest income + noninterest income (NOT gross interest income). "
             "rect = net loans and leases receivable. "
             "cogs, invt, gp, and xsga should be null — banks have no inventory or cost of goods sold. "
         )
     else:
-        industry_note = ""
+        industry_note = f"\nNote: This is a {industry} industry company{sic_note}." if sic else ""
 
     return f"""You are mapping XBRL tags from a SEC {form_type} filing to Compustat financial data fields.
 Your goal is to reproduce the same field values that Compustat (WRDS) would assign for this filing.
@@ -514,18 +515,14 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
     txt    = values.get("txt",    0.0)
     mib_ni = values.get("mib_ni", 0.0)
     ib     = values.get("ib",     0.0)
-    _check("NetIncome", ib, pi - txt - mib_ni)
+    _check("NetIncome", ib, pi - txt)
 
-    # --- Net Income attribution: ni = ib - mib_ni ---
-    # Skip for companies with preferred stock: the ni-ib gap may reflect
-    # non-cash preferred accretion (not captured in any mapped field), which
-    # would produce a large false residual.
-    ni   = values.get("ni",   0.0)
-    pstk = values.get("pstk", 0.0)
-    if not pstk:
-        _check("NetIncome_attribution", ni, ib - mib_ni)
+    # --- Net Income attribution: ni should equal ib (both map to NetIncomeLoss post-ASC 810) ---
+    ni = values.get("ni", 0.0)
+    if ni and ib:
+        _check("NetIncome_attribution", ni, ib)
 
-    # --- Cash Flow total: component sum should equal reported net change in cash ---
+# --- Cash Flow total: component sum should equal reported net change in cash ---
     oancf = values.get("oancf", 0.0)
     ivncf = values.get("ivncf", 0.0)
     fincf = values.get("fincf", 0.0)
@@ -603,7 +600,7 @@ def map_filing(
     industry = classify_industry(sic)
 
     # 4. Map with Kimi K2.6
-    prompt = build_prompt(facts, form_type, industry)
+    prompt = build_prompt(facts, form_type, industry, sic=sic)
     model_used, mapping = _invoke_kimi(prompt, openrouter_api_key)
     log.info("Kimi (%s) produced %d field assignments", model_used, sum(1 for v in mapping.values() if v))
 
