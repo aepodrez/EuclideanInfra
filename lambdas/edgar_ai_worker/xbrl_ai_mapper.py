@@ -573,7 +573,7 @@ def map_filing(
     residuals = validate_anchors(values, industry, facts=facts)
     log.info("Residuals: %s", {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
 
-    # 7. Build output row
+    # 7. Build output row — convert to Compustat units (millions of USD)
     row: dict = {
         "cik":       cik_padded,
         "ticker":    ticker,
@@ -581,7 +581,8 @@ def map_filing(
         "form_type": form_type,
         "industry":  industry,
     }
-    row.update(values)
+    for field, val in values.items():
+        row[field] = round(val / 1_000_000, 6)
     row["_anchor_residuals"] = json.dumps(residuals)
     row["_ai_mapping"]       = json.dumps(mapping)
     row["_model_used"]       = model_used
