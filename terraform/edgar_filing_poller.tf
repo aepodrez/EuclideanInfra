@@ -46,7 +46,7 @@ resource "aws_iam_role_policy" "edgar_filing_poller" {
         Effect = "Allow"
         Action = ["s3:GetObject", "s3:PutObject"]
         Resource = [
-          "${aws_s3_bucket.pipeline_data.arn}/universe/universe.csv"
+          "${aws_s3_bucket.pipeline_data.arn}/data-ingress/Static/universe.csv"
         ]
       },
       {
@@ -80,7 +80,7 @@ resource "aws_lambda_function" "edgar_filing_poller" {
   environment {
     variables = {
       S3_BUCKET      = aws_s3_bucket.pipeline_data.id
-      UNIVERSE_KEY   = "universe/universe.csv"
+      UNIVERSE_KEY   = "data-ingress/Static/universe.csv"
       SQS_QUEUE_URL  = aws_sqs_queue.edgar_filings.url
       EDGAR_IDENTITY = var.edgar_identity
       LOOKBACK_DAYS  = "90"
