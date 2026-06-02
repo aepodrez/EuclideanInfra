@@ -298,24 +298,27 @@ JSON mapping:"""
 # ---------------------------------------------------------------------------
 # Bedrock invocation
 # ---------------------------------------------------------------------------
-_BEDROCK_MODEL_FAST   = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+_BEDROCK_MODEL_FAST   = "us.amazon.nova-lite-v1:0"
 _BEDROCK_MODEL_STRONG = "us.deepseek.r1-v1:0"
 
 _MODEL_INFERENCE_CONFIG = {
-    _BEDROCK_MODEL_FAST:   {"maxTokens": 4096,  "temperature": 0},
+    _BEDROCK_MODEL_FAST:   {"maxTokens": 2048,  "temperature": 0},
     _BEDROCK_MODEL_STRONG: {"maxTokens": 16000, "temperature": 0},
 }
 
-# Residual names that are absolute values (not relative %) — excluded from fallback threshold
-_ABSOLUTE_RESIDUAL_CHECKS = {"CashFlow_componentSum", "Bank_NetInterestIncome"}
+# Only these checks trigger an R1 fallback — checks where R1 actually resolves the
+# residual. Partition checks (LiabilitiesCurrent, AssetsCurrent, Equity_decomposition)
+# and NetIncome_attribution are structural XBRL data gaps that R1 cannot fix either,
+# so falling back on them wastes money without improving data quality.
+_FALLBACK_TRIGGER_CHECKS = {"BalanceSheet", "NetIncome", "GrossProfit", "Liabilities_total"}
 
-# If the fast model's max relative residual exceeds this, fall back to the strong model
+# If the fast model's max residual on trigger checks exceeds this, fall back to R1
 _FALLBACK_THRESHOLD = 0.15
 
 
 def _max_relative_residual(residuals: dict) -> float:
     vals = [v for k, v in residuals.items()
-            if k not in _ABSOLUTE_RESIDUAL_CHECKS and isinstance(v, float)]
+            if k in _FALLBACK_TRIGGER_CHECKS and isinstance(v, float)]
     return max(vals, default=0.0)
 
 
