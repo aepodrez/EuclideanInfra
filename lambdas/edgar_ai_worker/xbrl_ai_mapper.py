@@ -1,6 +1,6 @@
-"""XBRL-to-Compustat field mapper using Bedrock LLM + accounting identity validation.
+"""XBRL-to-Compustat field mapper using Kimi K2.6 via OpenRouter + accounting identity validation.
 
-Entry point: map_filing(cik, accession, form_type, ticker, sic, bedrock_client)
+Entry point: map_filing(cik, accession, form_type, ticker, sic, openrouter_api_key)
 Returns a flat dict of Compustat field values for one filing, ready to write as parquet.
 
 Uses the SEC EDGAR companyfacts REST API (no edgartools dependency) so it is
@@ -298,33 +298,16 @@ JSON mapping:"""
 # ---------------------------------------------------------------------------
 # Model configuration
 # ---------------------------------------------------------------------------
-_BEDROCK_MODEL_FAST      = "us.amazon.nova-lite-v1:0"           # fast tier — Bedrock Nova Lite
-_OPENROUTER_API_URL      = "https://openrouter.ai/api/v1/chat/completions"
-_OPENROUTER_MODEL_STRONG = "moonshotai/kimi-k2.6:free"           # strong tier — OpenRouter free
-
-# Only these checks trigger a strong-model fallback — checks where Kimi actually
-# resolves the residual. Partition checks are structural XBRL data gaps.
-_FALLBACK_TRIGGER_CHECKS = {"BalanceSheet", "NetIncome", "GrossProfit", "Liabilities_total"}
+_OPENROUTER_API_URL   = "https://openrouter.ai/api/v1/chat/completions"
+_OPENROUTER_MODEL     = "moonshotai/kimi-k2.6:free"
 
 # Priority-ordered XBRL tags for the net change in cash this period.
-# The first tag found in the filing's facts is used as the reference for CashFlow_total.
 _DCASH_TAGS = [
     "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
     "CashAndCashEquivalentsPeriodIncreaseDecrease",
     "CashAndCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect",
     "NetCashProvidedByUsedInContinuingOperations",
 ]
-
-# Strong model (Kimi K2.6) is free via OpenRouter, so threshold is set aggressively.
-# 1.0 = fall back when identity is off by >100% — catches real tag errors.
-# ~38% fallback rate against 382-filing sample.
-_FALLBACK_THRESHOLD = 1.0
-
-
-def _max_relative_residual(residuals: dict) -> float:
-    vals = [v for k, v in residuals.items()
-            if k in _FALLBACK_TRIGGER_CHECKS and isinstance(v, float)]
-    return max(vals, default=0.0)
 
 
 def _parse_llm_json(text: str) -> dict[str, Optional[str]]:
@@ -340,27 +323,10 @@ def _parse_llm_json(text: str) -> dict[str, Optional[str]]:
     }
 
 
-def _invoke_bedrock_fast(prompt: str, bedrock_client) -> dict[str, Optional[str]]:
-    """Call Nova Lite via Bedrock converse API."""
-    response = bedrock_client.converse(
-        modelId=_BEDROCK_MODEL_FAST,
-        messages=[{"role": "user", "content": [{"text": prompt}]}],
-        inferenceConfig={"maxTokens": 2048, "temperature": 0},
-    )
-    text = ""
-    for block in response["output"]["message"]["content"]:
-        if "text" in block:
-            text = block["text"].strip()
-            break
-    if not text:
-        raise ValueError(f"No text block in Bedrock response: {response['output']['message']['content']}")
-    return _parse_llm_json(text)
-
-
-def _invoke_openrouter_strong(prompt: str, api_key: str) -> dict[str, Optional[str]]:
+def _invoke_kimi(prompt: str, api_key: str) -> dict[str, Optional[str]]:
     """Call Kimi K2.6 via OpenRouter (OpenAI-compatible chat completions)."""
     payload = json.dumps({
-        "model": _OPENROUTER_MODEL_STRONG,
+        "model": _OPENROUTER_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 16000,
         "temperature": 0,
@@ -520,22 +486,14 @@ def map_filing(
     form_type: str,
     ticker: str,
     sic: Optional[str] = None,
-    bedrock_client=None,
     openrouter_api_key: str = "",
 ) -> dict:
-    """
-    Fetch XBRL facts for one filing, map tags to Compustat fields via LLM,
-    validate accounting identities, and return a flat row dict.
-
-    Fast path: Nova Lite via Bedrock.
-    Fallback: Kimi K2.6 via OpenRouter (free tier) when residuals exceed threshold.
-    The returned dict can be written directly as a single-row parquet file.
-    """
+    """Fetch XBRL facts, map to Compustat fields via Kimi K2.6, validate, return row dict."""
     cik_padded = str(int(cik)).zfill(10)
 
     log.info("map_filing: cik=%s accession=%s form=%s ticker=%s", cik, accession, form_type, ticker)
 
-    # 1. Filing metadata (report_date)
+    # 1. Filing metadata
     metadata = fetch_filing_metadata(cik_padded, accession)
     report_date = metadata.get("report_date", "")
     log.info("report_date=%s", report_date)
@@ -548,29 +506,17 @@ def map_filing(
     # 3. Industry
     industry = classify_industry(sic)
 
-    # 4. Fast model (Nova Lite via Bedrock)
+    # 4. Map with Kimi K2.6
     prompt = build_prompt(facts, form_type, industry)
-    mapping = _invoke_bedrock_fast(prompt, bedrock_client)
-    log.info("Fast model produced %d field assignments", sum(1 for v in mapping.values() if v))
+    mapping = _invoke_kimi(prompt, openrouter_api_key)
+    log.info("Kimi produced %d field assignments", sum(1 for v in mapping.values() if v))
 
     # 5. Extract numeric values
     values = extract_values(facts, mapping)
 
     # 6. Validate
     residuals = validate_anchors(values, industry, facts=facts)
-    max_residual = _max_relative_residual(residuals)
-    log.info("Fast model residuals (max=%.3f): %s", max_residual,
-             {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
-
-    model_used = _BEDROCK_MODEL_FAST
-    if max_residual > _FALLBACK_THRESHOLD:
-        log.info("Residual %.3f > %.2f — falling back to %s",
-                 max_residual, _FALLBACK_THRESHOLD, _OPENROUTER_MODEL_STRONG)
-        mapping   = _invoke_openrouter_strong(prompt, openrouter_api_key)
-        values    = extract_values(facts, mapping)
-        residuals = validate_anchors(values, industry, facts=facts)
-        model_used = _OPENROUTER_MODEL_STRONG
-        log.info("Strong model residuals: %s", {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
+    log.info("Residuals: %s", {k: f"{v:.3f}" for k, v in residuals.items() if isinstance(v, float)})
 
     # 7. Build output row
     row: dict = {
@@ -583,6 +529,6 @@ def map_filing(
     row.update(values)
     row["_anchor_residuals"] = json.dumps(residuals)
     row["_ai_mapping"]       = json.dumps(mapping)
-    row["_model_used"]       = model_used
+    row["_model_used"]       = _OPENROUTER_MODEL
 
     return row

@@ -1,9 +1,8 @@
 """Edgar AI Worker Lambda.
 
 Triggered by SQS. Each message describes one new SEC filing (10-K or 10-Q).
-Fetches XBRL facts, maps them to Compustat fields via Nova Lite (fast) and
-Kimi K2.6 via OpenRouter (strong fallback), validates accounting identities,
-and writes a single-row parquet to S3.
+Fetches XBRL facts, maps them to Compustat fields via Kimi K2.6 (OpenRouter),
+validates accounting identities, and writes a single-row parquet to S3.
 
 SQS message format:
     {
@@ -36,8 +35,7 @@ log.setLevel(logging.INFO)
 
 S3_BUCKET = os.environ["S3_BUCKET"]
 
-_s3      = boto3.client("s3")
-_bedrock = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+_s3 = boto3.client("s3")
 
 _OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
 
@@ -85,7 +83,6 @@ def _process_message(body: dict) -> None:
         form_type=form_type,
         ticker=ticker,
         sic=sic,
-        bedrock_client=_bedrock,
         openrouter_api_key=_OPENROUTER_API_KEY,
     )
 
