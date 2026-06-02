@@ -321,8 +321,10 @@ _DCASH_TAGS = [
     "NetCashProvidedByUsedInContinuingOperations",
 ]
 
-# If the fast model's max residual on trigger checks exceeds this, fall back to R1
-_FALLBACK_THRESHOLD = 0.15
+# If the fast model's max residual on trigger checks exceeds this, fall back to R1.
+# 10.0 = only fall back on catastrophic mismatches (identity off by >1000%).
+# Calibrated to keep full-universe backfill cost under $50 at ~11% R1 usage.
+_FALLBACK_THRESHOLD = 10.0
 
 
 def _max_relative_residual(residuals: dict) -> float:
