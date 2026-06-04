@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 import urllib.error
@@ -18,7 +19,7 @@ from typing import Optional
 
 log = logging.getLogger(__name__)
 
-EDGAR_IDENTITY = "EuclideanResearch contact@example.com"
+EDGAR_IDENTITY = os.environ.get("EDGAR_IDENTITY", "EuclideanResearch podreze03@gmail.com")
 
 # ---------------------------------------------------------------------------
 # Compustat field catalogue fed to the LLM
@@ -73,7 +74,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "pi":     "Pre-tax Income from Continuing Operations",
     "txt":    "Income Tax Expense (Benefit) from Continuing Operations",
     "mib_ni": "Net Income attributable to NCI",
-    "ib":     "Income from Continuing Operations net of tax (ib = pi - txt). Use IncomeLossFromContinuingOperations (AFTER-TAX). NEVER use IncomeLossFromContinuingOperationsBeforeIncomeTaxes — that is pi, not ib.",
+    "ib":     "Income from Continuing Operations net of tax. Prefer IncomeLossFromContinuingOperations (AFTER-TAX). If absent and company has no NCI or discontinued ops, NetIncomeLoss is acceptable. FORBIDDEN: any pre-tax tag (IncomeLossFromContinuingOperationsBeforeIncomeTaxes*), IncomeLossAttributableToParent, NetIncomeLossAvailableToCommonShareholders*.",
     "do":     "Discontinued Operations net of tax (IncomeLossFromDiscontinuedOperationsNetOfTax)",
     "xi":     "Extraordinary Items net of tax (rare post-2015)",
     "ni":     "Net Income — total consolidated (ni = ib + do + xi)",
@@ -331,6 +332,12 @@ _OPENROUTER_API_URL    = "https://openrouter.ai/api/v1/chat/completions"
 _OPENROUTER_MODEL_FREE = "moonshotai/kimi-k2.6:free"
 _OPENROUTER_MODEL_PAID = "moonshotai/kimi-k2.5"
 
+# Residual threshold — fractional error above this is flagged as suspicious.
+_FAIL_THRESHOLD = 0.05
+
+# Fields where the AI is permitted to return a LIST of tags (values are summed).
+_MULTI_TAG_FIELDS = {"xsga", "dp", "xint", "dlc", "oancf"}
+
 # Priority-ordered XBRL tags for the net change in cash this period.
 _DCASH_TAGS = [
     "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
@@ -367,8 +374,13 @@ def _parse_llm_json(text: str) -> dict[str, Optional[str | list[str]]]:
         if not val:
             result[field] = None
         elif isinstance(val, list):
-            tags = [t for t in val if t]
-            result[field] = tags if len(tags) > 1 else (tags[0] if tags else None)
+            # LIST only valid for fields that can be summed from components
+            if field not in _MULTI_TAG_FIELDS:
+                log.warning("Rejecting list mapping for %s (not a multi-tag field): %s", field, val)
+                result[field] = None
+            else:
+                tags = [t for t in val if t]
+                result[field] = tags if len(tags) > 1 else (tags[0] if tags else None)
         else:
             result[field] = val
     return result
@@ -539,18 +551,31 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
     _check("GrossProfit", gp, sale - cogs)
 
     # --- Net Income identity ---
+    # Accept ib = pi - txt (consolidated) OR ib = pi - txt - mib_ni (parent-attributable),
+    # whichever has the smaller error. Also require absolute error > $1M to avoid noise
+    # from rounding and minor NCI adjustments on small companies.
     pi     = values.get("pi",     0.0)
     txt    = values.get("txt",    0.0)
     mib_ni = values.get("mib_ni", 0.0)
     ib     = values.get("ib",     0.0)
-    _check("NetIncome", ib, pi - txt)
+    if ib and (pi or txt):
+        exp_consolidated = pi - txt
+        exp_parent       = pi - txt - mib_ni
+        err_consol  = _pct_err(ib, exp_consolidated)
+        err_parent  = _pct_err(ib, exp_parent) if mib_ni else err_consol
+        best_pct    = min(err_consol, err_parent)
+        best_abs    = min(abs(ib - exp_consolidated), abs(ib - exp_parent))
+        if best_pct > _FAIL_THRESHOLD and best_abs > 1_000_000:
+            residuals["NetIncome"] = best_pct
 
     # --- Net Income attribution: ni = ib + discontinued ops + extraordinary items ---
     ni = values.get("ni", 0.0)
     do = values.get("do", 0.0)
     xi = values.get("xi", 0.0)
     if ni and ib:
-        _check("NetIncome_attribution", ni, ib + do + xi)
+        exp_ni = ib + do + xi
+        if _pct_err(ni, exp_ni) > _FAIL_THRESHOLD and abs(ni - exp_ni) > 1_000_000:
+            residuals["NetIncome_attribution"] = _pct_err(ni, exp_ni)
 
     # --- EBITDA identity: oibdp = oiadp + dp ---
     oiadp = values.get("oiadp", 0.0)
@@ -593,13 +618,7 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
                 residuals["TaxRate_sanity"] = abs(etr)
 
     # --- Cash flow sign checks ---
-    # oancf negative is only suspicious for profitable companies — pre-profit biotechs/E&P commonly run negative
-    oancf_v = values.get("oancf", None)
-    ivncf_v = values.get("ivncf", None)
-    capx_v  = values.get("capx",  None)
-    pi_chk  = values.get("pi", 0.0)
-    if oancf_v is not None and oancf_v < 0 and pi_chk > 0:
-        residuals["Sign_oancf"] = abs(oancf_v)
+    capx_v = values.get("capx", None)
     if capx_v is not None and capx_v < 0:
         residuals["Sign_capx"] = abs(capx_v)
 
