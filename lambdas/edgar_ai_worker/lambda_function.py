@@ -61,13 +61,17 @@ def _write_parquet(row: dict, bucket: str, key: str) -> None:
     pq.write_table(table, buf, compression="snappy")
     buf.seek(0)
 
+    # Tag no_facts stubs in S3 metadata so the poller can skip re-queuing them
+    # for any future filing date (universe reconciliation signal).
+    xbrl_status = row.get("_xbrl_status", "ok")
     _s3.put_object(
         Bucket=bucket,
         Key=key,
         Body=buf.read(),
         ContentType="application/octet-stream",
+        Metadata={"xbrl_status": xbrl_status},
     )
-    log.info("wrote parquet to s3://%s/%s", bucket, key)
+    log.info("wrote parquet to s3://%s/%s (xbrl_status=%s)", bucket, key, xbrl_status)
 
 
 def _process_message(body: dict) -> None:

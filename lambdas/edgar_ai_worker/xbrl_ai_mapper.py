@@ -759,7 +759,21 @@ def map_filing(
     # 2. XBRL facts
     facts = fetch_xbrl_facts(cik_padded, accession, form_type)
     if not facts:
-        raise RuntimeError(f"No XBRL facts found for {cik} / {accession}")
+        log.warning(
+            "No XBRL facts for cik=%s accession=%s — returning no_facts stub (skip Kimi)",
+            cik, accession,
+        )
+        return {
+            "cik":               cik_padded,
+            "ticker":            ticker,
+            "datadate":          report_date,
+            "form_type":         form_type,
+            "industry":          classify_industry(sic),
+            "_xbrl_status":      "no_facts",
+            "_anchor_residuals": "{}",
+            "_ai_mapping":       "{}",
+            "_model_used":       "",
+        }
 
     # 3. Industry
     industry = classify_industry(sic)

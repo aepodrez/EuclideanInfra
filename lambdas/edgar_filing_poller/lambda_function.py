@@ -69,17 +69,34 @@ def _load_universe() -> list[dict]:
         cik = (row.get("cik") or "").strip()
         ticker = (row.get("ticker") or "").strip().upper()
         sic = (row.get("sic") or "").strip()
+        no_xbrl = (row.get("no_xbrl") or "").strip() == "1"
         if cik:
-            rows.append({"cik": str(int(cik)).zfill(10), "ticker": ticker, "sic": sic})
-    log.info("Loaded universe: %d companies", len(rows))
+            rows.append({
+                "cik":     str(int(cik)).zfill(10),
+                "ticker":  ticker,
+                "sic":     sic,
+                "no_xbrl": no_xbrl,
+            })
+    no_xbrl_count = sum(1 for r in rows if r["no_xbrl"])
+    log.info("Loaded universe: %d companies (%d flagged no_xbrl)", len(rows), no_xbrl_count)
     return rows
 
 
-def _write_universe(rows: list[dict]) -> None:
+def _write_universe(rows: list[dict], no_xbrl_updates: dict[str, bool] | None = None) -> None:
+    if no_xbrl_updates:
+        for row in rows:
+            if row["cik"] in no_xbrl_updates:
+                row["no_xbrl"] = no_xbrl_updates[row["cik"]]
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=["ticker", "cik", "sic"])
+    writer = csv.DictWriter(buf, fieldnames=["ticker", "cik", "sic", "no_xbrl"])
     writer.writeheader()
-    writer.writerows(rows)
+    for row in rows:
+        writer.writerow({
+            "ticker":  row["ticker"],
+            "cik":     row["cik"],
+            "sic":     row["sic"],
+            "no_xbrl": "1" if row.get("no_xbrl") else "",
+        })
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=UNIVERSE_KEY,
@@ -103,6 +120,19 @@ def _file_exists(key: str) -> bool:
         if code in ("404", "NoSuchKey", "403"):
             return False
         raise
+
+
+def _is_no_xbrl_filing(key: str) -> bool:
+    """Return True when the existing parquet was written as a no_facts stub.
+
+    Uses the S3 object metadata tag set by the edgar_ai_worker — avoids reading
+    the parquet body or depending on pyarrow in the poller.
+    """
+    try:
+        resp = s3.head_object(Bucket=S3_BUCKET, Key=key)
+        return resp.get("Metadata", {}).get("xbrl_status") == "no_facts"
+    except ClientError:
+        return False
 
 
 def _filings_for_company(row: dict, lookback_cutoff: str) -> tuple[list[dict], str]:
@@ -154,12 +184,19 @@ def lambda_handler(event, context):
 
     filings_checked = 0
     messages_sent   = 0
-    sic_updates: dict[str, str] = {}  # cik -> new_sic for any changed SIC codes
+    skipped_no_xbrl = 0
+    sic_updates: dict[str, str] = {}         # cik -> new_sic
+    no_xbrl_updates: dict[str, bool] = {}    # cik -> True (newly confirmed no-XBRL)
 
     for i in range(0, len(universe), BATCH_SIZE):
         batch = universe[i : i + BATCH_SIZE]
-        with ThreadPoolExecutor(max_workers=len(batch)) as pool:
-            futs = {pool.submit(_filings_for_company, row, lookback_cutoff): row for row in batch}
+        # Don't hit EDGAR API for companies already confirmed to have no XBRL
+        active_batch = [row for row in batch if not row.get("no_xbrl")]
+        skipped_no_xbrl += len(batch) - len(active_batch)
+        if not active_batch:
+            continue
+        with ThreadPoolExecutor(max_workers=len(active_batch)) as pool:
+            futs = {pool.submit(_filings_for_company, row, lookback_cutoff): row for row in active_batch}
             for fut in as_completed(futs):
                 row = futs[fut]
                 filings, current_sic = fut.result()
@@ -175,6 +212,14 @@ def lambda_handler(event, context):
                     filings_checked += 1
                     key = _s3_key(filing["form_type"], filing["cik"], filing["report_date"])
                     if _file_exists(key):
+                        # Check if the existing parquet is a no_facts stub.
+                        # If so, flag the company so we never queue it again.
+                        if _is_no_xbrl_filing(key) and row["cik"] not in no_xbrl_updates:
+                            log.info(
+                                "Flagging %s (%s) as no_xbrl — existing parquet is a stub",
+                                row["ticker"], row["cik"],
+                            )
+                            no_xbrl_updates[row["cik"]] = True
                         continue
                     try:
                         sqs.send_message(
@@ -187,18 +232,27 @@ def lambda_handler(event, context):
                         log.error("Failed to queue %s %s: %s", filing["cik"], filing["accession_number"], e)
         time.sleep(BATCH_PAUSE_S)
 
-    if sic_updates:
-        log.info("Updating %d SIC code(s) in universe.csv", len(sic_updates))
-        for row in universe:
-            if row["cik"] in sic_updates:
-                row["sic"] = sic_updates[row["cik"]]
-        _write_universe(universe)
+    needs_write = bool(sic_updates or no_xbrl_updates)
+    if needs_write:
+        if sic_updates:
+            log.info("Updating %d SIC code(s) in universe.csv", len(sic_updates))
+            for row in universe:
+                if row["cik"] in sic_updates:
+                    row["sic"] = sic_updates[row["cik"]]
+        if no_xbrl_updates:
+            log.info("Flagging %d no-XBRL companies in universe.csv", len(no_xbrl_updates))
+        _write_universe(universe, no_xbrl_updates=no_xbrl_updates)
 
-    log.info("Done: %d filings checked, %d messages sent, %d SIC updates", filings_checked, messages_sent, len(sic_updates))
+    log.info(
+        "Done: %d filings checked, %d messages sent, %d SIC updates, %d no_xbrl flags, %d skipped",
+        filings_checked, messages_sent, len(sic_updates), len(no_xbrl_updates), skipped_no_xbrl,
+    )
     return {
-        "universe_size":    len(universe),
-        "lookback_cutoff":  lookback_cutoff,
-        "filings_checked":  filings_checked,
-        "messages_sent":    messages_sent,
-        "sic_updates":      len(sic_updates),
+        "universe_size":     len(universe),
+        "lookback_cutoff":   lookback_cutoff,
+        "filings_checked":   filings_checked,
+        "messages_sent":     messages_sent,
+        "sic_updates":       len(sic_updates),
+        "no_xbrl_flags":     len(no_xbrl_updates),
+        "skipped_no_xbrl":   skipped_no_xbrl,
     }
