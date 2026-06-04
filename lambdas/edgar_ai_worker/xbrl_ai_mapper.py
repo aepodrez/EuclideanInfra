@@ -54,7 +54,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     # Balance Sheet — Equity
     "seq":  "Total Stockholders Equity INCLUDING NCI (StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest)",
     "ceq":  "Common Equity attributable to parent",
-    "pstk": "Preferred Stock carrying value",
+    "pstk": "Preferred Stock carrying value. Use PreferredStockValue or PreferredStockValueOutstanding. NEVER TemporaryEquity* (that is mezzanine/redeemable preferred — separate from pstk). NEVER RedeemableNoncontrollingInterest* (that is mib).",
     "re":   "Retained Earnings (Accumulated Deficit)",
     "mib":  "Noncontrolling Interest balance (null for LP structures using PartnersCapital)",
     # Income Statement
@@ -322,10 +322,24 @@ Rules:
 - seq INCLUDES NCI — prefer StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest over plain StockholdersEquity when both exist.
 - Gains/losses on asset sales and goodwill impairments go to nopi or xsga, never sale.
 - A field may map to a LIST of tags when no aggregate exists. Valid only for: xsga, dp, xint, dlc, oancf.
-- FORBIDDEN tags (never use for any field):
+
+`ib` (Income from Continuing Operations net of tax) MAPPING RULES — read carefully:
+  1. FIRST CHOICE: IncomeLossFromContinuingOperations  (this is the AFTER-TAX continuing-ops line)
+  2. FALLBACK only if #1 is absent AND company has no NCI AND no discontinued ops: NetIncomeLoss
+  3. FORBIDDEN for ib (no exceptions):
+     - Any tag containing "BeforeIncomeTaxes" or "BeforeTax" — those are pi (pre-tax), not ib
+     - IncomeLossAttributableToParent — that's parent-only, not consolidated
+     - NetIncomeLoss*AvailableToCommonStockholders* — that's after preferred dividends, not ib
+     - NetIncomeLoss when mib_ni is also being mapped — use IncomeLossFromContinuingOperations instead
+
+When choosing between Revenue tags (Excluding/IncludingAssessedTax), pick the one
+where sale - cogs ≈ GrossProfit (if GrossProfit is also tagged in this filing).
+
+Universal FORBIDDEN tags (never use for any field):
   * CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect (derived net change, not a line item)
   * LiabilitiesAndStockholdersEquity (= total assets, not liabilities)
   * StockRepurchasedDuringPeriodValue, TreasuryStockValueAcquiredCostMethod (equity statement, not cash flow)
+  * TemporaryEquityCarryingAmount* (mezzanine/redeemable equity — not regular pstk)
 
 Return ONLY a JSON object."""
 
@@ -342,6 +356,42 @@ _FAIL_THRESHOLD = 0.05
 
 # Fields where the AI is permitted to return a LIST of tags (values are summed).
 _MULTI_TAG_FIELDS = {"xsga", "dp", "xint", "dlc", "oancf"}
+
+# Per-field tag denylist — if Kimi maps any of these, drop the mapping silently.
+# Used by _sanitize_mapping() before extract_values() to enforce hard rules that
+# the prompt repeatedly fails to make stick.
+_FIELD_TAG_DENYLIST: dict[str, tuple[str, ...]] = {
+    "ib": (
+        # Pre-tax tags (these are pi, not ib)
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesForeign",
+        # Parent-only / post-preferred-dividend tags
+        "IncomeLossAttributableToParent",
+        "NetIncomeLossAvailableToCommonStockholdersBasic",
+        "NetIncomeLossAvailableToCommonStockholdersDiluted",
+        "NetIncomeLossFromContinuingOperationsAvailableToCommonShareholdersBasic",
+        "NetIncomeLossFromContinuingOperationsAvailableToCommonShareholdersDiluted",
+    ),
+    "pstk": (
+        # Mezzanine / redeemable equity — not regular preferred stock
+        "TemporaryEquityCarryingAmount",
+        "TemporaryEquityCarryingAmountAttributableToParent",
+        "TemporaryEquityCarryingAmountAttributableToNoncontrollingInterest",
+        "TemporaryEquityCarryingAmountIncludingPortionAttributableToNoncontrollingInterests",
+        "RedeemableNoncontrollingInterestEquityPreferredCarryingAmount",
+        "RedeemableNoncontrollingInterestEquityCarryingAmount",
+    ),
+    "seq": (
+        # Total assets misidentified as equity
+        "LiabilitiesAndStockholdersEquity",
+    ),
+    "ni": (
+        "NetIncomeLossAvailableToCommonStockholdersBasic",
+        "NetIncomeLossAvailableToCommonStockholdersDiluted",
+    ),
+}
 
 # Priority-ordered XBRL tags for the net change in cash this period.
 _DCASH_TAGS = [
@@ -472,8 +522,30 @@ def _invoke_kimi(prompt: str, api_key: str) -> tuple[str, dict[str, Optional[str
 # ---------------------------------------------------------------------------
 # Value extraction + anchor validation
 # ---------------------------------------------------------------------------
+def _sanitize_mapping(mapping: dict[str, Optional[str | list[str]]]) -> None:
+    """In-place: drop any field→tag pairs that violate the per-field denylist.
+
+    Catches the recurring prompt failures (Kimi mapping pre-tax tags to `ib`,
+    mezzanine equity to `pstk`, etc.) before they reach extract_values.
+    """
+    for field, denied in _FIELD_TAG_DENYLIST.items():
+        tag = mapping.get(field)
+        if not tag:
+            continue
+        if isinstance(tag, list):
+            cleaned = [t for t in tag if t not in denied]
+            if len(cleaned) != len(tag):
+                log.warning("Sanitize: dropped denied tags from %s list: %s", field, set(tag)-set(cleaned))
+            mapping[field] = cleaned if cleaned else None
+        elif tag in denied:
+            log.warning("Sanitize: dropped %s mapping for %s (denylisted)", tag, field)
+            mapping[field] = None
+
+
 def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str | list[str]]]) -> dict[str, float]:
     """Apply the AI mapping to get numeric values for each Compustat field."""
+    _sanitize_mapping(mapping)
+
     values: dict[str, float] = {}
     for field, tag in mapping.items():
         if not tag:
@@ -509,6 +581,11 @@ def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str | li
     if values.get("seq") is None and values.get("ceq") is not None:
         if not values.get("pstk") and not values.get("mib"):
             values["seq"] = values["ceq"]
+
+    # Derive ib = pi - txt when ib is missing (often because we dropped a forbidden tag above).
+    # This is the GAAP identity and is safe whenever both pi and txt are mapped.
+    if values.get("ib") is None and "pi" in values and "txt" in values:
+        values["ib"] = values["pi"] - values["txt"]
 
     # Derive ceq = seq - pstk for companies with preferred stock.
     # Fires when: (a) AI left ceq null, or (b) AI mapped ceq to same tag as seq.
@@ -550,10 +627,14 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         _check("Liabilities_total", lt, lct + lt_noncurrent)
 
     # --- Gross Profit identity ---
+    # $1M absolute floor — micro-caps with sub-million GP otherwise produce huge %-residuals.
     sale = values.get("sale", 0.0)
     cogs = values.get("cogs", 0.0)
     gp   = values.get("gp",   0.0)
-    _check("GrossProfit", gp, sale - cogs)
+    if gp and sale and cogs:
+        exp = sale - cogs
+        if _pct_err(gp, exp) > _FAIL_THRESHOLD and abs(gp - exp) > 1_000_000:
+            residuals["GrossProfit"] = _pct_err(gp, exp)
 
     # --- Net Income identity ---
     # Accept ib = pi - txt (consolidated) OR ib = pi - txt - mib_ni (parent-attributable),
@@ -590,11 +671,14 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         _check("EBITDA", oibdp, oiadp + dp)
 
     # --- Equity decomposition: seq = ceq + pstk ---
+    # Require $1M absolute floor — tiny pstk values on small companies otherwise blow up.
     ceq  = values.get("ceq",  0.0)
     pstk = values.get("pstk", 0.0)
     seq  = values.get("seq",  0.0)
     if seq and ceq and pstk:
-        _check("Equity_decomposition", seq, ceq + pstk)
+        exp = ceq + pstk
+        if _pct_err(seq, exp) > _FAIL_THRESHOLD and abs(seq - exp) > 1_000_000:
+            residuals["Equity_decomposition"] = _pct_err(seq, exp)
 
     # --- Balance sheet sign sanity ---
     for field in ("che", "rect", "invt", "dltt", "at", "act", "ppent"):
@@ -602,7 +686,9 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         if v is not None and v < 0:
             residuals[f"Sign_{field}"] = abs(v)
 
-# --- Cash Flow total: component sum should equal reported net change in cash ---
+    # --- Cash Flow total: component sum should equal reported net change in cash ---
+    # Threshold raised to 8% with $5M absolute floor — small-cap CF rounding produces
+    # large percentage residuals on tiny absolute differences.
     oancf = values.get("oancf", 0.0)
     ivncf = values.get("ivncf", 0.0)
     fincf = values.get("fincf", 0.0)
@@ -610,14 +696,19 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
     if (oancf or ivncf or fincf) and facts:
         dcash = next((facts[t] for t in _DCASH_TAGS if t in facts), None)
         if dcash is not None:
-            _check("CashFlow_total", oancf + ivncf + fincf + exre, dcash)
+            cf_sum = oancf + ivncf + fincf + exre
+            if dcash and cf_sum:
+                pct = _pct_err(cf_sum, dcash)
+                if pct > 0.08 and abs(cf_sum - dcash) > 5_000_000:
+                    residuals["CashFlow_total"] = pct
 
     # --- Effective tax rate sanity (non-bank) ---
-    # txt / pi should be 0–60% for profitable companies; tax benefits on loss years are normal
+    # txt / pi should be 0–60% for profitable companies with meaningful pre-tax income.
+    # Skip companies with tiny pi (<$10M) — small absolute tax adjustments blow up the percentage.
     if industry not in ("BANK", "FINANCIAL"):
         pi_v  = values.get("pi",  0.0)
         txt_v = values.get("txt", 0.0)
-        if pi_v and pi_v > 0 and txt_v:
+        if pi_v and pi_v > 10_000_000 and txt_v:
             etr = txt_v / pi_v
             if not (0.0 <= etr <= 0.60):
                 residuals["TaxRate_sanity"] = abs(etr)
