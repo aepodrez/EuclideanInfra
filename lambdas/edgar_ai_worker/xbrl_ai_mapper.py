@@ -191,11 +191,16 @@ def fetch_xbrl_facts(cik: str, accession: str, form_type: str = "") -> dict[str,
     accession_norm = accession.replace("-", "")
     is_quarterly = form_type.upper().startswith("10-Q")
 
-    # For each concept, track (value, duration_days) — pick the longest-duration match
+    # For each concept, track (value, duration_days) — pick the longest-duration match.
+    # Check both us-gaap and ifrs-full taxonomies; IFRS filers (e.g. Canadian companies
+    # on NYSE) use ifrs-full tags which Kimi maps to Compustat fields just as naturally.
     best: dict[str, tuple[float, int]] = {}
-    us_gaap = data.get("facts", {}).get("us-gaap", {})
+    facts_section = data.get("facts", {})
+    taxonomy = facts_section.get("us-gaap") or facts_section.get("ifrs-full") or {}
+    if not taxonomy:
+        log.warning("No us-gaap or ifrs-full facts found for accession %s", accession)
 
-    for concept, info in us_gaap.items():
+    for concept, info in taxonomy.items():
         usd_entries = info.get("units", {}).get("USD", [])
         for entry in usd_entries:
             if entry.get("accn", "").replace("-", "") != accession_norm:
