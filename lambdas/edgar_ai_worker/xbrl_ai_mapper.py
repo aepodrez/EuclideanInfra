@@ -452,9 +452,12 @@ def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
     request_body: dict = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 16000,
+        "max_tokens": 4000,
         "temperature": 0,
+        # Disable thinking/reasoning on Kimi models — two params needed:
+        # OpenRouter's wrapper uses "reasoning", Moonshot's native API uses "thinking".
         "reasoning": {"enabled": False},
+        "thinking": {"type": "disabled"},
         "response_format": {"type": "json_object"},
     }
     payload = json.dumps(request_body).encode()
