@@ -498,13 +498,16 @@ def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
 
 
 def _invoke_kimi(prompt: str, api_key: str) -> tuple[str, dict[str, Optional[str]]]:
-    """Try free tier first; fall back to paid if rate-limited. Returns (model_used, mapping)."""
+    """Try free tier first; fall back to paid if rate-limited or quota exhausted. Returns (model_used, mapping)."""
     try:
         return _call_openrouter(_OPENROUTER_MODEL_FREE, prompt, api_key)
     except urllib.error.HTTPError as exc:
-        if exc.code != 429:
+        if exc.code == 429:
+            log.warning("Free tier rate-limited — falling back to paid kimi-k2.6")
+        elif exc.code == 402:
+            log.warning("Free tier quota/credits exhausted (402) — falling back to paid kimi-k2.6")
+        else:
             raise
-        log.warning("Free tier rate-limited — falling back to paid kimi-k2.6")
     except ValueError:
         log.warning("Free tier returned no JSON — falling back to paid kimi-k2.6")
 
