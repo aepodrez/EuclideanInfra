@@ -609,6 +609,19 @@ def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str | li
         if ceq_v is None or ceq_v == seq_v:
             values["ceq"] = seq_v - pstk_v
 
+    # Detect Kimi mapping seq → StockholdersEquity (common equity only) when pstk exists.
+    # Symptom: lt + seq ≠ at, but lt + seq + pstk ≈ at.
+    # Correction: seq = seq_mapped + pstk  (total equity),  ceq = seq_mapped (common equity).
+    at_v   = values.get("at",   0.0)
+    lt_v   = values.get("lt",   0.0)
+    seq_v2 = values.get("seq",  0.0)
+    pstk_v2 = values.get("pstk", 0.0)
+    if at_v and lt_v and seq_v2 and pstk_v2:
+        if _pct_err(at_v, lt_v + seq_v2) > 0.05:
+            if _pct_err(at_v, lt_v + seq_v2 + pstk_v2) < 0.02:
+                values["ceq"] = seq_v2
+                values["seq"] = seq_v2 + pstk_v2
+
     return values
 
 
