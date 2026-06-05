@@ -355,7 +355,7 @@ Return ONLY a JSON object."""
 # ---------------------------------------------------------------------------
 _OPENROUTER_API_URL    = "https://openrouter.ai/api/v1/chat/completions"
 _OPENROUTER_MODEL_FREE = "moonshotai/kimi-k2.6:free"
-_OPENROUTER_MODEL_PAID = "moonshotai/kimi-k2.6"
+_OPENROUTER_MODEL_PAID = "moonshotai/kimi-k2.5"
 
 # Residual threshold — fractional error above this is flagged as suspicious.
 _FAIL_THRESHOLD = 0.05
