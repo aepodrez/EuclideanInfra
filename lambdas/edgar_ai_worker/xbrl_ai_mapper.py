@@ -186,7 +186,13 @@ def fetch_xbrl_facts(cik: str, accession: str, form_type: str = "") -> dict[str,
 
     cik_padded = str(int(cik)).zfill(10)
     url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_padded}.json"
-    data = _http_get_json(url)
+    try:
+        data = _http_get_json(url)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            log.warning("No companyfacts for CIK %s (404) — subsidiary or non-XBRL filer", cik)
+            return {}
+        raise
 
     accession_norm = accession.replace("-", "")
     is_quarterly = form_type.upper().startswith("10-Q")

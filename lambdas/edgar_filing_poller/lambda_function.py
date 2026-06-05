@@ -128,12 +128,21 @@ def _filings_for_company(row: dict, lookback_cutoff: str) -> tuple[list[dict], s
     filed_dates  = recent.get("filingDate", [])
 
     results = []
+    cik_int = str(int(cik))  # CIK without leading zeros, for accession prefix check
     for acc, form, report_date, filed_date in zip(accessions, forms, report_dates, filed_dates):
         if form not in ("10-K", "10-Q"):
             continue
         if filed_date < lookback_cutoff:
             continue
         if not report_date or not acc:
+            continue
+        # Skip filings submitted by a different entity (combined/parent filings).
+        # Accession format: {filer_CIK}-{year}-{seq}. If the filer CIK doesn't
+        # match this company's CIK, the XBRL is filed under the parent and we
+        # won't find it under this subsidiary's companyfacts.
+        filer_cik = acc.split("-")[0].lstrip("0") or "0"
+        if filer_cik != cik_int:
+            log.debug("Skipping %s for CIK %s — filed by parent CIK %s", acc, cik, filer_cik)
             continue
         results.append({
             "cik":              cik,
