@@ -506,24 +506,40 @@ def _call_openrouter(model: str, prompt: str, api_key: str) -> tuple[str, dict]:
     return model, _parse_llm_json(text)
 
 
+def _mapping_is_empty(mapping: dict) -> bool:
+    return not any(v for v in mapping.values())
+
+
 def _invoke_kimi(prompt: str, api_key: str) -> tuple[str, dict[str, Optional[str]]]:
-    """Try free tier first; fall back to paid if rate-limited or quota exhausted. Returns (model_used, mapping)."""
+    """Try free tier first; fall back to paid if rate-limited, quota exhausted, or empty mapping.
+    Returns (model_used, mapping)."""
+    free_model_used = None
+    free_mapping    = None
     try:
-        return _call_openrouter(_OPENROUTER_MODEL_FREE, prompt, api_key)
+        free_model_used, free_mapping = _call_openrouter(_OPENROUTER_MODEL_FREE, prompt, api_key)
+        if not _mapping_is_empty(free_mapping):
+            return free_model_used, free_mapping
+        log.warning("Free tier returned empty mapping — falling back to paid kimi-k2.5")
     except urllib.error.HTTPError as exc:
         if exc.code == 429:
-            log.warning("Free tier rate-limited — falling back to paid kimi-k2.6")
+            log.warning("Free tier rate-limited — falling back to paid kimi-k2.5")
         elif exc.code == 402:
-            log.warning("Free tier quota/credits exhausted (402) — falling back to paid kimi-k2.6")
+            log.warning("Free tier quota/credits exhausted (402) — falling back to paid kimi-k2.5")
         else:
             raise
     except ValueError:
-        log.warning("Free tier returned no JSON — falling back to paid kimi-k2.6")
+        log.warning("Free tier returned no JSON — falling back to paid kimi-k2.5")
 
     # Paid model (non-thinking) — content is always populated.
     for attempt in range(1, 3):
         try:
-            return _call_openrouter(_OPENROUTER_MODEL_PAID, prompt, api_key)
+            paid_model, paid_mapping = _call_openrouter(_OPENROUTER_MODEL_PAID, prompt, api_key)
+            if not _mapping_is_empty(paid_mapping):
+                return paid_model, paid_mapping
+            log.warning("Paid model attempt %d returned empty mapping — retrying", attempt)
+            if attempt == 2:
+                # Return free mapping if paid also empty, else empty paid mapping
+                return (free_model_used, free_mapping) if free_mapping is not None else (paid_model, paid_mapping)
         except ValueError:
             if attempt == 2:
                 raise
@@ -598,6 +614,12 @@ def extract_values(facts: dict[str, float], mapping: dict[str, Optional[str | li
     # This is the GAAP identity and is safe whenever both pi and txt are mapped.
     if values.get("ib") is None and "pi" in values and "txt" in values:
         values["ib"] = values["pi"] - values["txt"]
+
+    # Derive ni = ib when ni is not mapped and there are no discontinued ops or extraordinary items.
+    # Safe because ni = ib + do + xi, and do/xi are zero for most companies.
+    if values.get("ni") is None and values.get("ib") is not None:
+        if not values.get("do") and not values.get("xi"):
+            values["ni"] = values["ib"]
 
     # Derive ceq = seq - pstk for companies with preferred stock.
     # Fires when: (a) AI left ceq null, or (b) AI mapped ceq to same tag as seq.
@@ -679,14 +701,20 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         if best_pct > _FAIL_THRESHOLD and best_abs > 1_000_000:
             residuals["NetIncome"] = best_pct
 
-    # --- Net Income attribution: ni = ib + discontinued ops + extraordinary items ---
-    ni = values.get("ni", 0.0)
-    do = values.get("do", 0.0)
-    xi = values.get("xi", 0.0)
+    # --- Net Income attribution: ni = ib + mib_ni + discontinued ops + extraordinary items ---
+    # Accept either parent-attributable (ib + do + xi) or consolidated (ib + mib_ni + do + xi),
+    # whichever has smaller error — same pattern as the NetIncome check above.
+    ni     = values.get("ni",     0.0)
+    do     = values.get("do",     0.0)
+    xi     = values.get("xi",     0.0)
+    mib_ni = values.get("mib_ni", 0.0)
     if ni and ib:
-        exp_ni = ib + do + xi
-        if _pct_err(ni, exp_ni) > _FAIL_THRESHOLD and abs(ni - exp_ni) > 1_000_000:
-            residuals["NetIncome_attribution"] = _pct_err(ni, exp_ni)
+        exp_parent       = ib + do + xi
+        exp_consolidated = ib + mib_ni + do + xi
+        best_pct = min(_pct_err(ni, exp_parent), _pct_err(ni, exp_consolidated))
+        best_abs = min(abs(ni - exp_parent), abs(ni - exp_consolidated))
+        if best_pct > _FAIL_THRESHOLD and best_abs > 1_000_000:
+            residuals["NetIncome_attribution"] = best_pct
 
     # --- EBITDA identity: oibdp = oiadp + dp ---
     oiadp = values.get("oiadp", 0.0)
@@ -755,7 +783,14 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         # Only check net interest income identity when all three revenue components are mapped
         if sale_v and revt_interest and revt_noninterest:
             _check("Bank_NetInterestIncome", net_interest, sale_v - revt_noninterest)
-        _check("Bank_Revenue_partition", sale_v, net_interest + revt_noninterest)
+        # Only flag Bank_Revenue_partition when absolute gap > $50M — large-bank XBRL uses
+        # many sub-line revenue tags that don't always roll up to a single "total revenue" tag,
+        # so small community banks and large banks need separate absolute floors.
+        if sale_v and (net_interest or revt_noninterest):
+            expected = net_interest + revt_noninterest
+            pct = _pct_err(sale_v, expected)
+            if pct > _FAIL_THRESHOLD and abs(sale_v - expected) > 50_000_000:
+                residuals["Bank_Revenue_partition"] = pct
 
     return residuals
 
@@ -803,10 +838,13 @@ def map_filing(
     # 3. Industry
     industry = classify_industry(sic)
 
-    # 4. Map with Kimi K2.6
+    # 4. Map with Kimi
     prompt = build_prompt(facts, form_type, industry, sic=sic)
     model_used, mapping = _invoke_kimi(prompt, openrouter_api_key)
-    log.info("Kimi (%s) produced %d field assignments", model_used, sum(1 for v in mapping.values() if v))
+    mapped_count = sum(1 for v in mapping.values() if v)
+    log.info("Kimi (%s) produced %d field assignments", model_used, mapped_count)
+    if mapped_count == 0:
+        log.warning("Empty mapping after all retries for cik=%s accession=%s — parquet will have all-null fields", cik, accession)
 
     # 5. Extract numeric values
     values = extract_values(facts, mapping)
