@@ -63,6 +63,15 @@ resource "aws_iam_role_policy" "edgar_ai_worker" {
         ]
         Resource = [aws_sqs_queue.edgar_filings.arn]
       },
+      {
+        Sid    = "SSMDailyCounter"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:PutParameter",
+        ]
+        Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/euclidean/edgar-worker/daily-invocations"
+      },
     ]
   })
 }
@@ -98,6 +107,6 @@ resource "aws_lambda_event_source_mapping" "edgar_ai_worker_sqs" {
   function_response_types            = ["ReportBatchItemFailures"]
 
   scaling_config {
-    maximum_concurrency = 10
+    maximum_concurrency = 2
   }
 }

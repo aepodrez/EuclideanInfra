@@ -19,6 +19,7 @@ S3 output:
 """
 from __future__ import annotations
 
+import datetime
 import io
 import json
 import logging
@@ -34,10 +35,35 @@ log = logging.getLogger()
 log.setLevel(logging.INFO)
 
 S3_BUCKET = os.environ["S3_BUCKET"]
+MAX_DAILY_INVOCATIONS = int(os.environ.get("MAX_DAILY_INVOCATIONS", "2000"))
+_SSM_COUNTER_KEY = "/euclidean/edgar-worker/daily-invocations"
 
-_s3 = boto3.client("s3")
+_s3  = boto3.client("s3")
+_ssm = boto3.client("ssm")
 
 _OPENROUTER_API_KEY = os.environ["OPENROUTER_API_KEY"]
+
+
+def _check_daily_limit() -> bool:
+    """Increment today's invocation counter. Returns True if limit reached."""
+    today = datetime.date.today().isoformat()
+    try:
+        resp  = _ssm.get_parameter(Name=_SSM_COUNTER_KEY)
+        data  = json.loads(resp["Parameter"]["Value"])
+        count = data["count"] if data.get("date") == today else 0
+    except _ssm.exceptions.ParameterNotFound:
+        count = 0
+    count += 1
+    _ssm.put_parameter(
+        Name=_SSM_COUNTER_KEY,
+        Value=json.dumps({"date": today, "count": count}),
+        Type="String",
+        Overwrite=True,
+    )
+    if count > MAX_DAILY_INVOCATIONS:
+        log.warning("Daily invocation limit %d reached (count=%d) — dropping batch", MAX_DAILY_INVOCATIONS, count)
+        return True
+    return False
 
 
 def _s3_key(form_type: str, cik: str, report_date: str) -> str:
@@ -98,6 +124,9 @@ def _process_message(body: dict) -> None:
 def lambda_handler(event, context):
     records = event.get("Records", [])
     log.info("received %d SQS record(s)", len(records))
+
+    if _check_daily_limit():
+        return {}  # success → SQS deletes the message; poller re-queues tomorrow
 
     failures = []
     for record in records:

@@ -407,6 +407,16 @@ _DCASH_TAGS = [
     "NetCashProvidedByUsedInContinuingOperations",
 ]
 
+# Post-ASC 230 (2018): the primary dcash tag includes restricted cash movements.
+# These tags capture the restricted cash change so we can subtract it from dcash
+# before comparing to oancf+ivncf+fincf+exre (which cover only unrestricted cash).
+_RESTRICTED_CASH_CHANGE_TAGS = [
+    "IncreaseDecreaseInRestrictedCash",
+    "IncreaseDecreaseInRestrictedCashAndInvestments",
+    "RestrictedCashAndCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+    "RestrictedCashPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+]
+
 
 def _parse_llm_json(text: str) -> dict[str, Optional[str | list[str]]]:
     """Extract and normalise the JSON mapping from an LLM response string.
@@ -747,9 +757,16 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
     fincf = values.get("fincf", 0.0)
     exre  = values.get("exre",  0.0)
     if (oancf or ivncf or fincf) and facts:
-        dcash = next((facts[t] for t in _DCASH_TAGS if t in facts), None)
-        if dcash is not None:
+        dcash_tag = next((t for t in _DCASH_TAGS if t in facts), None)
+        if dcash_tag is not None:
+            dcash  = facts[dcash_tag]
             cf_sum = oancf + ivncf + fincf + exre
+            # Post-ASC 230: if dcash comes from the restricted-cash-inclusive tag,
+            # subtract any separately reported restricted cash change so the comparison
+            # is apples-to-apples with our CF components (unrestricted cash only).
+            if dcash_tag == _DCASH_TAGS[0]:
+                restricted = next((facts[t] for t in _RESTRICTED_CASH_CHANGE_TAGS if t in facts), 0.0)
+                dcash -= restricted
             if dcash and cf_sum:
                 pct = _pct_err(cf_sum, dcash)
                 if pct > 0.08 and abs(cf_sum - dcash) > 5_000_000:

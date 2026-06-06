@@ -17,7 +17,7 @@ resource "aws_sqs_queue" "edgar_filings" {
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.edgar_filings_dlq.arn
-    maxReceiveCount     = 3
+    maxReceiveCount     = 1
   })
 
   tags = local.common_tags
