@@ -152,6 +152,8 @@ def _filings_for_company(row: dict, lookback_cutoff: str) -> tuple[list[dict], s
             "accession_number": acc,
             "report_date":      report_date,
         })
+    # EDGAR returns filings newest-first; keep that order so callers can take
+    # the first entry to get the most recent filing.
     return results, current_sic
 
 
@@ -181,20 +183,23 @@ def lambda_handler(event, context):
                     )
                     sic_updates[row["cik"]] = current_sic
 
-                for filing in filings:
+                # Only queue the single most recent filing per company.
+                # EDGAR returns filings newest-first, so filings[0] is the latest.
+                # If it's already in S3 the company is up-to-date; skip older ones.
+                if filings:
+                    filing = filings[0]
                     filings_checked += 1
                     key = _s3_key(filing["form_type"], filing["cik"], filing["report_date"])
-                    if _file_exists(key):
-                        continue
-                    try:
-                        sqs.send_message(
-                            QueueUrl=SQS_QUEUE_URL,
-                            MessageBody=json.dumps(filing),
-                        )
-                        messages_sent += 1
-                        log.info("Queued %s %s %s", filing["ticker"], filing["form_type"], filing["report_date"])
-                    except Exception as e:
-                        log.error("Failed to queue %s %s: %s", filing["cik"], filing["accession_number"], e)
+                    if not _file_exists(key):
+                        try:
+                            sqs.send_message(
+                                QueueUrl=SQS_QUEUE_URL,
+                                MessageBody=json.dumps(filing),
+                            )
+                            messages_sent += 1
+                            log.info("Queued %s %s %s", filing["ticker"], filing["form_type"], filing["report_date"])
+                        except Exception as e:
+                            log.error("Failed to queue %s %s: %s", filing["cik"], filing["accession_number"], e)
         time.sleep(BATCH_PAUSE_S)
 
     if sic_updates:
