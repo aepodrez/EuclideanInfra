@@ -183,13 +183,18 @@ def lambda_handler(event, context):
                     )
                     sic_updates[row["cik"]] = current_sic
 
-                # Only queue the single most recent filing per company.
-                # EDGAR returns filings newest-first, so filings[0] is the latest.
-                # If it's already in S3 the company is up-to-date; skip older ones.
-                if filings:
-                    filing = filings[0]
+                # Queue at most one 10-K and one 10-Q per company (most recent of each).
+                # EDGAR returns filings newest-first, so the first match per form type
+                # is the latest. Skip if already in S3.
+                seen_forms: set[str] = set()
+                for filing in filings:
+                    form = filing["form_type"]
+                    base = "annual" if "10-K" in form or "20-F" in form else "quarterly"
+                    if base in seen_forms:
+                        continue
+                    seen_forms.add(base)
                     filings_checked += 1
-                    key = _s3_key(filing["form_type"], filing["cik"], filing["report_date"])
+                    key = _s3_key(form, filing["cik"], filing["report_date"])
                     if not _file_exists(key):
                         try:
                             sqs.send_message(
@@ -197,9 +202,11 @@ def lambda_handler(event, context):
                                 MessageBody=json.dumps(filing),
                             )
                             messages_sent += 1
-                            log.info("Queued %s %s %s", filing["ticker"], filing["form_type"], filing["report_date"])
+                            log.info("Queued %s %s %s", filing["ticker"], form, filing["report_date"])
                         except Exception as e:
                             log.error("Failed to queue %s %s: %s", filing["cik"], filing["accession_number"], e)
+                    if len(seen_forms) == 2:
+                        break
         time.sleep(BATCH_PAUSE_S)
 
     if sic_updates:
