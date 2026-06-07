@@ -52,7 +52,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "lco":           "Other Current Liabilities (OtherLiabilitiesCurrent, OperatingLeaseLiabilityCurrent)",
     "lo":            "Other Noncurrent Liabilities",
     # Balance Sheet — Equity
-    "seq":  "Total Stockholders Equity INCLUDING NCI (StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest)",
+    "seq":  "Total Stockholders Equity INCLUDING NCI. Prefer StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest when it exists AND reconciles to at-lt. For insurance/financial companies with large AOCI: if StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest is deeply negative while StockholdersEquity is positive and at ≈ lt + StockholdersEquity, prefer StockholdersEquity.",
     "ceq":  "Common Equity attributable to parent",
     "pstk": "Preferred Stock carrying value. Use PreferredStockValue or PreferredStockValueOutstanding. NEVER TemporaryEquity* (that is mezzanine/redeemable preferred — separate from pstk). NEVER RedeemableNoncontrollingInterest* (that is mib).",
     "re":   "Retained Earnings (Accumulated Deficit)",
@@ -62,7 +62,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "revt_interest": "Interest Income (banks only)",
     "revt_noninterest": "Non-Interest Income (banks only)",
     "cogs":   "Cost of Goods Sold / Cost of Revenue",
-    "gp":     "Gross Profit",
+    "gp":     "Gross Profit (GrossProfit tag only). NEVER OperatingIncomeLoss — that is after SG&A, not gross profit. If no GrossProfit tag exists, set gp=null.",
     "xsga":   "Selling, General & Administrative Expense",
     "xrd":    "Research & Development Expense",
     "xad":    "Advertising Expense",
@@ -71,18 +71,18 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "oiadp":  "Operating Income / Loss (AFTER D&A)",
     "oibdp":  "Operating Income BEFORE D&A (EBITDA; often not directly tagged)",
     "nopi":   "Non-operating Income net — includes gains/losses on asset sales",
-    "pi":     "Pre-tax Income from Continuing Operations",
+    "pi":     "Pre-tax Income from Continuing Operations (AFTER interest expense, BEFORE income taxes). FORBIDDEN: any tag containing 'BeforeInterestExpense' or 'BeforeInterestIncomeAndExpense' — those are EBIT, not pre-tax income. If only a 'BeforeInterest*' tag exists, set pi=null.",
     "txt":    "Income Tax Expense (Benefit) from Continuing Operations",
-    "mib_ni": "Net Income attributable to NCI",
-    "ib":     "Income from Continuing Operations net of tax. Prefer IncomeLossFromContinuingOperations (AFTER-TAX). If absent and company has no NCI or discontinued ops, NetIncomeLoss is acceptable. FORBIDDEN: any pre-tax tag (IncomeLossFromContinuingOperationsBeforeIncomeTaxes*), IncomeLossAttributableToParent, NetIncomeLossAvailableToCommonShareholders*.",
-    "do":     "Discontinued Operations net of tax (IncomeLossFromDiscontinuedOperationsNetOfTax)",
+    "mib_ni": "Net Income attributable to NCI. Prefer NetIncomeLossAttributableToNoncontrollingInterest or NetIncomeLossAttributableToNonredeemableNoncontrollingInterest. FORBIDDEN: ComprehensiveIncomeNetOfTaxAttributableToNoncontrollingInterest — that includes OCI, not just net income.",
+    "ib":     "Income from Continuing Operations net of tax. Prefer IncomeLossFromContinuingOperations (AFTER-TAX). If absent and company has no NCI or discontinued ops, NetIncomeLoss is acceptable. FORBIDDEN: any pre-tax tag (IncomeLossFromContinuingOperationsBeforeIncomeTaxes*), IncomeLossAttributableToParent, NetIncomeLossAvailableToCommonShareholders*. SANITY CHECK: ib should be approximately pi-txt; if the tag you chose equals pi (pre-tax), you picked the wrong tag.",
+    "do":     "Discontinued Operations net of tax (IncomeLossFromDiscontinuedOperationsNetOfTax or IncomeLossFromDiscontinuedOperationsNetOfTaxAttributableToReportingEntity). FORBIDDEN: any tag containing 'ExcludingDiscontinuedOperations' — that is NOT discontinued operations. FORBIDDEN: pre-tax disposal tags (IncomeLossFromIndividuallySignificantComponentDisposedOf*BeforeIncomeTax).",
     "xi":     "Extraordinary Items net of tax (rare post-2015)",
-    "ni":     "Net Income — total consolidated (ni = ib + do + xi)",
+    "ni":     "Net Income — total consolidated (ni = ib + do + xi). FORBIDDEN: ComprehensiveIncomeNetOfTax*, ComprehensiveIncomeNetOfTaxIncludingPortionAttributableToNoncontrollingInterest — those include Other Comprehensive Income (OCI) and are NOT net income.",
     # Cash Flow — outflow fields stored as POSITIVE magnitudes
     "oancf":  "Net Cash from Operating Activities (NetCashProvidedByUsedInOperatingActivities). If no aggregate tag exists, use a LIST: [NetCashProvidedByUsedInOperatingActivitiesContinuingOperations, CashProvidedByUsedInOperatingActivitiesDiscontinuedOperations]",
     "ivncf":  "Net Cash from Investing Activities",
     "fincf":  "Net Cash from Financing Activities",
-    "exre":   "Effect of FX on Cash (EffectOfExchangeRateOnCash* only)",
+    "exre":   "Effect of FX on Cash (EffectOfExchangeRateOnCash* only). FORBIDDEN: CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect — that is the TOTAL net change in cash, not just FX. For banks and domestic-only companies with no foreign operations, set exre=null.",
     "capx":   "Capital Expenditures (PaymentsToAcquirePropertyPlantAndEquipment)",
     "dvc":    "Common Dividends Paid",
     "dvp":    "Preferred Dividends Paid",
@@ -325,9 +325,9 @@ Rules:
 - Cash flow fields (oancf, ivncf, fincf, capx, prstkc, scstkc, dvc, dvp, dltis, dltr) must come from cash flow statement tags only.
 - Outflow fields (capx, prstkc, dvc, dltr) are stored as POSITIVE magnitudes (Payments* tags are already positive).
 - ppent must be NET (PropertyPlantAndEquipmentNet, not Gross).
-- seq INCLUDES NCI — prefer StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest over plain StockholdersEquity when both exist.
+- seq INCLUDES NCI — prefer StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest over plain StockholdersEquity when both exist AND the IncludingNCI value makes sense (i.e. at ≈ lt + IncludingNCI value).
 - Gains/losses on asset sales and goodwill impairments go to nopi or xsga, never sale.
-- A field may map to a LIST of tags when no aggregate exists. Valid only for: xsga, dp, xint, dlc, oancf.
+- A field may map to a LIST of tags when no aggregate exists. Valid only for: xsga, dp, xint, dlc, oancf, ivncf, fincf.
 
 `ib` (Income from Continuing Operations net of tax) MAPPING RULES — read carefully:
   1. FIRST CHOICE: IncomeLossFromContinuingOperations  (this is the AFTER-TAX continuing-ops line)
@@ -361,7 +361,7 @@ _OPENROUTER_MODEL_PAID = "moonshotai/kimi-k2.5"
 _FAIL_THRESHOLD = 0.05
 
 # Fields where the AI is permitted to return a LIST of tags (values are summed).
-_MULTI_TAG_FIELDS = {"xsga", "dp", "xint", "dlc", "oancf"}
+_MULTI_TAG_FIELDS = {"xsga", "dp", "xint", "dlc", "oancf", "ivncf", "fincf"}
 
 # Per-field tag denylist — if Kimi maps any of these, drop the mapping silently.
 # Used by _sanitize_mapping() before extract_values() to enforce hard rules that
@@ -380,6 +380,44 @@ _FIELD_TAG_DENYLIST: dict[str, tuple[str, ...]] = {
         "NetIncomeLossFromContinuingOperationsAvailableToCommonShareholdersBasic",
         "NetIncomeLossFromContinuingOperationsAvailableToCommonShareholdersDiluted",
     ),
+    "pi": (
+        # EBIT tags (before interest AND taxes) — pi must be after interest, before taxes only
+        "IncomeLossFromContinuingOperationsBeforeInterestExpenseInterestIncomeIncomeTaxesExtraordinaryItemsNoncontrollingInterestsNet",
+        "IncomeLossFromContinuingOperationsBeforeInterestAndIncomeTaxes",
+        "IncomeLossFromOperationsBeforeIncomeTaxesAndExtraordinaryItems",
+    ),
+    "gp": (
+        # Operating income is NOT gross profit
+        "OperatingIncomeLoss",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+    ),
+    "ni": (
+        # Comprehensive Income includes OCI — not the same as net income
+        "ComprehensiveIncomeNetOfTax",
+        "ComprehensiveIncomeNetOfTaxIncludingPortionAttributableToNoncontrollingInterest",
+        "OtherComprehensiveIncomeLossNetOfTax",
+        "NetIncomeLossAvailableToCommonStockholdersBasic",
+        "NetIncomeLossAvailableToCommonStockholdersDiluted",
+    ),
+    "mib_ni": (
+        # Comprehensive income for NCI includes OCI — use NetIncomeLoss version only
+        "ComprehensiveIncomeNetOfTaxAttributableToNoncontrollingInterest",
+        "OtherComprehensiveIncomeLossNetOfTaxPortionAttributableToNoncontrollingInterest",
+    ),
+    "do": (
+        # These are NOT discontinued operations — they are pre-tax or disposal-only items
+        "IncomeLossFromIndividuallySignificantComponentDisposedOfOrHeldForSaleExcludingDiscontinuedOperationsBeforeIncomeTax",
+        "IncomeLossFromIndividuallySignificantComponentDisposedOfOrHeldForSaleExcludingDiscontinuedOperationsAfterIncomeTax",
+        "GainLossOnDispositionOfAssets",
+        "GainLossOnSaleOfBusiness",
+    ),
+    "exre": (
+        # These are the TOTAL net change in cash — not just the FX effect on cash
+        "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+        "CashAndCashEquivalentsPeriodIncreaseDecrease",
+        "CashAndCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect",
+        "NetCashProvidedByUsedInContinuingOperations",
+    ),
     "pstk": (
         # Mezzanine / redeemable equity — not regular preferred stock
         "TemporaryEquityCarryingAmount",
@@ -392,10 +430,6 @@ _FIELD_TAG_DENYLIST: dict[str, tuple[str, ...]] = {
     "seq": (
         # Total assets misidentified as equity
         "LiabilitiesAndStockholdersEquity",
-    ),
-    "ni": (
-        "NetIncomeLossAvailableToCommonStockholdersBasic",
-        "NetIncomeLossAvailableToCommonStockholdersDiluted",
     ),
 }
 
@@ -693,15 +727,14 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         if _pct_err(gp, exp) > _FAIL_THRESHOLD and abs(gp - exp) > 1_000_000:
             residuals["GrossProfit"] = _pct_err(gp, exp)
 
-    # --- Net Income identity ---
-    # Accept ib = pi - txt (consolidated) OR ib = pi - txt - mib_ni (parent-attributable),
-    # whichever has the smaller error. Also require absolute error > $1M to avoid noise
-    # from rounding and minor NCI adjustments on small companies.
+    # --- Net Income identity: ib ≈ pi - txt ---
+    # Require pi to be non-null — without it the denominator becomes txt alone,
+    # producing meaningless residuals for companies that tag only txt (MLPs, banks).
     pi     = values.get("pi",     0.0)
     txt    = values.get("txt",    0.0)
     mib_ni = values.get("mib_ni", 0.0)
     ib     = values.get("ib",     0.0)
-    if ib and (pi or txt):
+    if ib and pi:
         exp_consolidated = pi - txt
         exp_parent       = pi - txt - mib_ni
         err_consol  = _pct_err(ib, exp_consolidated)
@@ -711,18 +744,26 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         if best_pct > _FAIL_THRESHOLD and best_abs > 1_000_000:
             residuals["NetIncome"] = best_pct
 
-    # --- Net Income attribution: ni = ib + mib_ni + discontinued ops + extraordinary items ---
-    # Accept either parent-attributable (ib + do + xi) or consolidated (ib + mib_ni + do + xi),
-    # whichever has smaller error — same pattern as the NetIncome check above.
+    # --- Net Income attribution ---
+    # Three accepted formulas (whichever gives smallest error):
+    #   A. ni = ib + do + xi                  — ni is consolidated, ib is parent-only
+    #   B. ni = ib + mib_ni + do + xi         — ni is consolidated, ib is consolidated
+    #   C. ni = ib - mib_ni + do + xi         — ni is parent-only, ib is consolidated
+    # Formula C handles LP structures and companies where NetIncomeLoss = parent share
+    # while IncomeLossFromContinuingOperations = consolidated.
     ni     = values.get("ni",     0.0)
     do     = values.get("do",     0.0)
     xi     = values.get("xi",     0.0)
     mib_ni = values.get("mib_ni", 0.0)
     if ni and ib:
-        exp_parent       = ib + do + xi
-        exp_consolidated = ib + mib_ni + do + xi
-        best_pct = min(_pct_err(ni, exp_parent), _pct_err(ni, exp_consolidated))
-        best_abs = min(abs(ni - exp_parent), abs(ni - exp_consolidated))
+        exp_a = ib + do + xi
+        exp_b = ib + mib_ni + do + xi
+        exp_c = ib - mib_ni + do + xi
+        candidates = [exp_a, exp_b]
+        if mib_ni:
+            candidates.append(exp_c)
+        best_pct = min(_pct_err(ni, e) for e in candidates)
+        best_abs = min(abs(ni - e) for e in candidates)
         if best_pct > _FAIL_THRESHOLD and best_abs > 1_000_000:
             residuals["NetIncome_attribution"] = best_pct
 
@@ -734,14 +775,23 @@ def validate_anchors(values: dict[str, float], industry: str = "GENERAL", facts:
         _check("EBITDA", oibdp, oiadp + dp)
 
     # --- Equity decomposition: seq = ceq + pstk ---
-    # Require $1M absolute floor — tiny pstk values on small companies otherwise blow up.
+    # Three accepted formulas:
+    #   ceq + pstk          — pstk is additive, no NCI
+    #   ceq + pstk + mib    — pstk is additive, mib is additive
+    #   ceq + mib           — pstk is already included within ceq (common for many companies)
+    # The third formula handles cases where pstk is reported as a component of StockholdersEquity.
     ceq  = values.get("ceq",  0.0)
     pstk = values.get("pstk", 0.0)
     seq  = values.get("seq",  0.0)
+    mib  = values.get("mib",  0.0)
     if seq and ceq and pstk:
-        exp = ceq + pstk
-        if _pct_err(seq, exp) > _FAIL_THRESHOLD and abs(seq - exp) > 1_000_000:
-            residuals["Equity_decomposition"] = _pct_err(seq, exp)
+        candidates = [ceq + pstk]
+        if mib:
+            candidates.append(ceq + pstk + mib)
+            candidates.append(ceq + mib)
+        best_pct = min(_pct_err(seq, e) for e in candidates)
+        if best_pct > _FAIL_THRESHOLD and min(abs(seq - e) for e in candidates) > 1_000_000:
+            residuals["Equity_decomposition"] = best_pct
 
     # --- Balance sheet sign sanity ---
     for field in ("che", "rect", "invt", "dltt", "at", "act", "ppent"):
