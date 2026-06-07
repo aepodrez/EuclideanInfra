@@ -152,8 +152,7 @@ def _filings_for_company(row: dict, lookback_cutoff: str) -> tuple[list[dict], s
             "accession_number": acc,
             "report_date":      report_date,
         })
-    # EDGAR returns filings newest-first; keep that order so callers can take
-    # the first entry to get the most recent filing.
+    results.sort(key=lambda f: f["report_date"], reverse=True)
     return results, current_sic
 
 
