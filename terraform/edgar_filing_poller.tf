@@ -94,7 +94,7 @@ resource "aws_lambda_function" "edgar_filing_poller" {
       UNIVERSE_KEY   = "universe/universe.csv"
       SQS_QUEUE_URL  = aws_sqs_queue.edgar_filings.url
       EDGAR_IDENTITY = var.edgar_identity
-      LOOKBACK_DAYS  = "90"
+      LOOKBACK_DAYS  = "365"
     }
   }
 
