@@ -61,7 +61,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "sale":          "Net Revenue / Net Sales (banks: net interest + noninterest income)",
     "revt_interest": "Interest Income (banks only)",
     "revt_noninterest": "Non-Interest Income (banks only)",
-    "cogs":   "Cost of Goods Sold / Cost of Revenue",
+    "cogs":   "Cost of Goods Sold / Cost of Revenue. Prefer CostOfRevenue or CostOfGoodsAndServicesSold. FORBIDDEN: CostOfGoodsAndServiceExcludingDepreciationDepletionAndAmortization (excludes D&A, understates COGS). FORBIDDEN: CostDirectLabor (labor only, not total COGS). If no aggregate COGS tag exists, set cogs=null.",
     "gp":     "Gross Profit (GrossProfit tag only). NEVER OperatingIncomeLoss — that is after SG&A, not gross profit. If no GrossProfit tag exists, set gp=null.",
     "xsga":   "Selling, General & Administrative Expense",
     "xrd":    "Research & Development Expense",
@@ -79,9 +79,9 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "xi":     "Extraordinary Items net of tax (rare post-2015)",
     "ni":     "Net Income — total consolidated (ni = ib + do + xi). FORBIDDEN: ComprehensiveIncomeNetOfTax*, ComprehensiveIncomeNetOfTaxIncludingPortionAttributableToNoncontrollingInterest — those include Other Comprehensive Income (OCI) and are NOT net income.",
     # Cash Flow — outflow fields stored as POSITIVE magnitudes
-    "oancf":  "Net Cash from Operating Activities (NetCashProvidedByUsedInOperatingActivities). If no aggregate tag exists, use a LIST: [NetCashProvidedByUsedInOperatingActivitiesContinuingOperations, CashProvidedByUsedInOperatingActivitiesDiscontinuedOperations]",
-    "ivncf":  "Net Cash from Investing Activities",
-    "fincf":  "Net Cash from Financing Activities",
+    "oancf":  "Net Cash from Operating Activities. Prefer NetCashProvidedByUsedInOperatingActivities (aggregate). If absent, use LIST: [NetCashProvidedByUsedInOperatingActivitiesContinuingOperations, CashProvidedByUsedInOperatingActivitiesDiscontinuedOperations]. CRITICAL: if you use a LIST for oancf, you MUST also use a LIST for ivncf and fincf (mix aggregate+component = double-count). Conversely, if oancf uses the aggregate tag, ivncf and fincf must also use their aggregate tags — never mix aggregate with continuing-only.",
+    "ivncf":  "Net Cash from Investing Activities. Prefer NetCashProvidedByUsedInInvestingActivities (aggregate, already includes discontinued). FORBIDDEN: do NOT sum NetCashProvidedByUsedInInvestingActivities + CashProvidedByUsedInInvestingActivitiesDiscontinuedOperations — the aggregate already includes discontinued, summing them double-counts. If aggregate absent, use LIST: [NetCashProvidedByUsedInInvestingActivitiesContinuingOperations, CashProvidedByUsedInInvestingActivitiesDiscontinuedOperations].",
+    "fincf":  "Net Cash from Financing Activities. Prefer NetCashProvidedByUsedInFinancingActivities (aggregate). Same consistency rule as oancf/ivncf — use all aggregates or all components, never mixed.",
     "exre":   "Effect of FX on Cash (EffectOfExchangeRateOnCash* only). FORBIDDEN: CashCashEquivalentsRestrictedCash*PeriodIncreaseDecreaseIncludingExchangeRateEffect — that is the TOTAL net change in cash, not just FX. For banks and domestic-only companies with no foreign operations, set exre=null.",
     "capx":   "Capital Expenditures (PaymentsToAcquirePropertyPlantAndEquipment)",
     "dvc":    "Common Dividends Paid",
@@ -430,6 +430,21 @@ _FIELD_TAG_DENYLIST: dict[str, tuple[str, ...]] = {
     "seq": (
         # Total assets misidentified as equity
         "LiabilitiesAndStockholdersEquity",
+    ),
+    "cogs": (
+        # Labor-only cost — not total COGS (e.g. restaurants report labor separately)
+        "CostDirectLabor",
+        "CostDirectMaterials",
+        # Excludes D&A from COGS — understates true cost of goods sold
+        "CostOfGoodsAndServiceExcludingDepreciationDepletionAndAmortization",
+    ),
+    "ivncf": (
+        # Aggregate investing already includes discontinued — never sum these together
+        "CashProvidedByUsedInInvestingActivitiesDiscontinuedOperations",
+    ),
+    "fincf": (
+        # Aggregate financing already includes discontinued — never sum these together
+        "CashProvidedByUsedInFinancingActivitiesDiscontinuedOperations",
     ),
 }
 
