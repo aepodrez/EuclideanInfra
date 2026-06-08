@@ -40,7 +40,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "gdwl":      "Goodwill",
     "ivao":      "Long-term Investments",
     # Balance Sheet — Liabilities
-    "lt":            "Total Liabilities (Liabilities tag only; null if absent)",
+    "lt":            "Total Liabilities (Liabilities tag only; null if absent). Many filings only tag LiabilitiesAndStockholdersEquity (= total assets) and not Liabilities separately — if so, set lt=null. Do NOT compute lt from at-seq; only use a directly tagged value.",
     "lct":           "Total Current Liabilities",
     "lt_noncurrent": "Total Noncurrent Liabilities",
     "dlc":           "Short-term Debt (current maturities + ST borrowings)",
@@ -74,7 +74,7 @@ COMPUSTAT_FIELDS: dict[str, str] = {
     "pi":     "Pre-tax Income from Continuing Operations (AFTER interest expense, BEFORE income taxes). FORBIDDEN: any tag containing 'BeforeInterestExpense' or 'BeforeInterestIncomeAndExpense' — those are EBIT, not pre-tax income. If only a 'BeforeInterest*' tag exists, set pi=null.",
     "txt":    "Income Tax Expense (Benefit) from Continuing Operations",
     "mib_ni": "Net Income attributable to NCI. Prefer NetIncomeLossAttributableToNoncontrollingInterest or NetIncomeLossAttributableToNonredeemableNoncontrollingInterest. FORBIDDEN: ComprehensiveIncomeNetOfTaxAttributableToNoncontrollingInterest — that includes OCI, not just net income.",
-    "ib":     "Income from Continuing Operations net of tax. Prefer IncomeLossFromContinuingOperations (AFTER-TAX). If absent and company has no NCI or discontinued ops, NetIncomeLoss is acceptable. FORBIDDEN: any pre-tax tag (IncomeLossFromContinuingOperationsBeforeIncomeTaxes*), IncomeLossAttributableToParent, NetIncomeLossAvailableToCommonShareholders*. SANITY CHECK: ib should be approximately pi-txt; if the tag you chose equals pi (pre-tax), you picked the wrong tag.",
+    "ib":     "Income from Continuing Operations net of tax. Prefer IncomeLossFromContinuingOperations (AFTER-TAX). If absent and company has no NCI or discontinued ops, NetIncomeLoss is acceptable. FORBIDDEN: any pre-tax tag (IncomeLossFromContinuingOperationsBeforeIncomeTaxes*), IncomeLossAttributableToParent, NetIncomeLossAvailableToCommonShareholders*. SANITY CHECK: ib should be approximately pi-txt; if the tag you chose equals pi (pre-tax), you picked the wrong tag. EXCEPTION: for investment managers, REITs, and financial companies with complex tax structures (deferred taxes, equity method income, NOLs), IncomeLossFromContinuingOperations may differ significantly from pi-txt — this is expected; still use IncomeLossFromContinuingOperations as ib.",
     "do":     "Discontinued Operations net of tax (IncomeLossFromDiscontinuedOperationsNetOfTax or IncomeLossFromDiscontinuedOperationsNetOfTaxAttributableToReportingEntity). FORBIDDEN: any tag containing 'ExcludingDiscontinuedOperations' — that is NOT discontinued operations. FORBIDDEN: pre-tax disposal tags (IncomeLossFromIndividuallySignificantComponentDisposedOf*BeforeIncomeTax).",
     "xi":     "Extraordinary Items net of tax (rare post-2015)",
     "ni":     "Net Income — total consolidated (ni = ib + do + xi). FORBIDDEN: ComprehensiveIncomeNetOfTax*, ComprehensiveIncomeNetOfTaxIncludingPortionAttributableToNoncontrollingInterest — those include Other Comprehensive Income (OCI) and are NOT net income.",
