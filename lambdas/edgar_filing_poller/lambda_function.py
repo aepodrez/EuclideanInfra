@@ -105,6 +105,19 @@ def _file_exists(key: str) -> bool:
         raise
 
 
+def _any_parquet_exists(form_type: str, cik: str) -> bool:
+    """Check if ANY parquet exists for this CIK + form family.
+
+    Uses a prefix listing instead of an exact key so date mismatches between
+    the EDGAR submissions API (reportDate) and the filing metadata
+    (period_of_report) don't cause false re-queuing.
+    """
+    folder = "annual" if "10-K" in form_type or "20-F" in form_type else "quarterly"
+    prefix = f"data-ingress/filings/{folder}/{cik}/"
+    resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix, MaxKeys=1)
+    return resp.get("KeyCount", 0) > 0
+
+
 
 def _filings_for_company(row: dict, lookback_cutoff: str) -> tuple[list[dict], str]:
     """Return (filings, current_sic) for this company.
@@ -193,8 +206,7 @@ def lambda_handler(event, context):
                         continue
                     seen_forms.add(base)
                     filings_checked += 1
-                    key = _s3_key(form, filing["cik"], filing["report_date"])
-                    if not _file_exists(key):
+                    if not _any_parquet_exists(form, filing["cik"]):
                         try:
                             sqs.send_message(
                                 QueueUrl=SQS_QUEUE_URL,
