@@ -105,17 +105,26 @@ def _file_exists(key: str) -> bool:
         raise
 
 
-def _any_parquet_exists(form_type: str, cik: str) -> bool:
-    """Check if ANY parquet exists for this CIK + form family.
+def _get_existing_accession(form_type: str, cik: str) -> str | None:
+    """Return the accession number stored in S3 metadata for the most recent
+    parquet for this CIK + form family, or None if no parquet exists.
 
-    Uses a prefix listing instead of an exact key so date mismatches between
-    the EDGAR submissions API (reportDate) and the filing metadata
-    (period_of_report) don't cause false re-queuing.
+    Uses a prefix listing to avoid date-mismatch false negatives, then HEADs
+    the most recent object to read its accession metadata.
     """
     folder = "annual" if "10-K" in form_type or "20-F" in form_type else "quarterly"
     prefix = f"data-ingress/filings/{folder}/{cik}/"
-    resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix, MaxKeys=1)
-    return resp.get("KeyCount", 0) > 0
+    resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix, MaxKeys=10)
+    keys = [obj["Key"] for obj in resp.get("Contents", []) if obj["Key"].endswith(".parquet")]
+    if not keys:
+        return None
+    # Most recent parquet by filename (report_date)
+    latest_key = sorted(keys, reverse=True)[0]
+    try:
+        head = s3.head_object(Bucket=S3_BUCKET, Key=latest_key)
+        return head.get("Metadata", {}).get("accession")
+    except ClientError:
+        return None
 
 
 
@@ -143,7 +152,7 @@ def _filings_for_company(row: dict, lookback_cutoff: str) -> tuple[list[dict], s
     results = []
     cik_int = str(int(cik))  # CIK without leading zeros, for accession prefix check
     for acc, form, report_date, filed_date in zip(accessions, forms, report_dates, filed_dates):
-        if form not in ("10-K", "10-Q"):
+        if form not in ("10-K", "10-K/A", "10-Q", "10-Q/A", "20-F", "20-F/A"):
             continue
         if filed_date < lookback_cutoff:
             continue
@@ -177,7 +186,6 @@ def _latest_parquet_date(form_type: str, cik: str) -> str | None:
     keys = [obj["Key"] for obj in resp.get("Contents", []) if obj["Key"].endswith(".parquet")]
     if not keys:
         return None
-    # Filename format: {report_date}.parquet — sort descending, take first
     dates = sorted([k.split("/")[-1].replace(".parquet", "") for k in keys], reverse=True)
     return dates[0]
 
@@ -248,7 +256,8 @@ def lambda_handler(event, context):
                         continue
                     seen_forms.add(base)
                     filings_checked += 1
-                    if not _any_parquet_exists(form, filing["cik"]):
+                    existing_acc = _get_existing_accession(form, filing["cik"])
+                    if existing_acc != filing["accession_number"]:
                         try:
                             sqs.send_message(
                                 QueueUrl=SQS_QUEUE_URL,

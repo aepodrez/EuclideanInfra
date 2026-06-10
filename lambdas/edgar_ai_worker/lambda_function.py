@@ -90,12 +90,13 @@ def _write_parquet(row: dict, bucket: str, key: str) -> None:
     # Tag no_facts stubs in S3 metadata so the poller can skip re-queuing them
     # for any future filing date (universe reconciliation signal).
     xbrl_status = row.get("_xbrl_status", "ok")
+    accession   = row.get("_accession", "")
     _s3.put_object(
         Bucket=bucket,
         Key=key,
         Body=buf.read(),
         ContentType="application/octet-stream",
-        Metadata={"xbrl_status": xbrl_status},
+        Metadata={"xbrl_status": xbrl_status, "accession": accession},
     )
     log.info("wrote parquet to s3://%s/%s (xbrl_status=%s)", bucket, key, xbrl_status)
 
@@ -115,6 +116,7 @@ def _process_message(body: dict) -> None:
         sic=sic,
         openrouter_api_key=_OPENROUTER_API_KEY,
     )
+    row["_accession"] = accession
 
     report_date = row.get("datadate", "unknown")
     key = _s3_key(form_type, cik, report_date)
