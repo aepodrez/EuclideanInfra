@@ -40,7 +40,8 @@ UNIVERSE_KEY   = os.environ.get("UNIVERSE_KEY", "universe.csv")
 STATIC_PREFIX  = os.environ.get("STATIC_PREFIX", "Static")
 FRED_SSM_PARAM = os.environ.get("FRED_SSM_PARAM", "/euclidean/market-data/fred-api-key")
 
-CODE_DIR    = "/var/task/DataDownloads"   # scripts baked into image here
+CODE_DIR    = os.environ.get("MD_CODE_DIR", "/var/task/DataDownloads")
+UTILS_DIR   = os.environ.get("MD_UTILS_DIR", "/var/task/utils")
 WORK_DIR    = "/tmp/DataDownloads"        # CWD at runtime (relative paths resolve from here)
 OUTPUT_DIR  = "/tmp/pyData/Intermediate"
 STATIC_DIR  = "/tmp/Static"
@@ -61,7 +62,7 @@ JOB_SPECS: dict[str, dict] = {
     "fama_french_monthly": {"module": "FamaFrenchMonthly", "outputs": ["monthlyFF.parquet"], "needs_fred": True, "needs_portfolio": True},
     "market_returns":      {"module": "MarketReturns",     "outputs": ["monthlyMarket.parquet"]},
     "treasury_bill_3m":    {"module": "TreasuryBill3M",    "outputs": ["TBill3M.parquet"], "needs_fred": True},
-    "ipo_dates":           {"module": "IPODates",          "outputs": ["IPODates.parquet", "IPODates.csv"]},
+    "ipo_dates":           {"module": "IPODates",          "outputs": ["IPODates.parquet", "IPODates.csv"], "entry": "build_ap_ipodates"},
 }
 
 
@@ -126,9 +127,12 @@ def lambda_handler(event, context):
     # 5. Run the script
     if CODE_DIR not in sys.path:
         sys.path.insert(0, CODE_DIR)
+    if UTILS_DIR not in sys.path:
+        sys.path.insert(0, UTILS_DIR)
     module = importlib.import_module(spec["module"])
-    if hasattr(module, "main"):
-        module.main()
+    entry = spec.get("entry", "main")
+    if hasattr(module, entry):
+        getattr(module, entry)()
     # else: module did its work at import time (e.g. VIX)
 
     # 6. Upload outputs
