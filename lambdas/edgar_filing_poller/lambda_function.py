@@ -169,11 +169,48 @@ def _filings_for_company(row: dict, lookback_cutoff: str) -> tuple[list[dict], s
     return results, current_sic
 
 
+def _latest_parquet_date(form_type: str, cik: str) -> str | None:
+    """Return the most recent report_date (YYYY-MM-DD) from parquet filenames, or None."""
+    folder = "annual" if "10-K" in form_type or "20-F" in form_type else "quarterly"
+    prefix = f"data-ingress/filings/{folder}/{cik}/"
+    resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix, MaxKeys=10)
+    keys = [obj["Key"] for obj in resp.get("Contents", []) if obj["Key"].endswith(".parquet")]
+    if not keys:
+        return None
+    # Filename format: {report_date}.parquet — sort descending, take first
+    dates = sorted([k.split("/")[-1].replace(".parquet", "") for k in keys], reverse=True)
+    return dates[0]
+
+
+def _needs_edgar_check(cik: str, today: str) -> bool:
+    """Return True if we should hit EDGAR for this company.
+
+    Skip only if BOTH filings exist AND are recent enough that a new one
+    can't be due yet (quarterly < 80 days old, annual < 350 days old).
+    """
+    from datetime import date as date_type
+
+    def _days_old(report_date: str) -> int:
+        try:
+            return (date_type.fromisoformat(today) - date_type.fromisoformat(report_date)).days
+        except Exception:
+            return 9999
+
+    annual_date    = _latest_parquet_date("10-K", cik)
+    quarterly_date = _latest_parquet_date("10-Q", cik)
+
+    annual_ok    = annual_date    is not None and _days_old(annual_date)    < 350
+    quarterly_ok = quarterly_date is not None and _days_old(quarterly_date) < 80
+
+    return not (annual_ok and quarterly_ok)
+
+
 def lambda_handler(event, context):
     universe = _load_universe()
     lookback_cutoff = (
         datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
     ).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     log.info("Polling filings filed on or after %s", lookback_cutoff)
 
     filings_checked = 0
@@ -182,12 +219,9 @@ def lambda_handler(event, context):
 
     for i in range(0, len(universe), BATCH_SIZE):
         batch = universe[i : i + BATCH_SIZE]
-        # Skip companies that already have both annual AND quarterly parquets — no
-        # need to hit the EDGAR API for them at all.
-        batch = [
-            row for row in batch
-            if not (_any_parquet_exists("10-K", row["cik"]) and _any_parquet_exists("10-Q", row["cik"]))
-        ]
+        # Skip EDGAR API call for companies whose filings are fresh enough that
+        # no new filing can be due yet — saves ~70% of EDGAR calls on typical runs.
+        batch = [row for row in batch if _needs_edgar_check(row["cik"], today)]
         if not batch:
             continue
         with ThreadPoolExecutor(max_workers=len(batch)) as pool:
