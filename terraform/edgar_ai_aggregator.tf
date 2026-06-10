@@ -87,7 +87,7 @@ resource "aws_lambda_function" "edgar_ai_aggregator" {
   handler          = "lambda_function.lambda_handler"
   filename         = data.archive_file.edgar_ai_aggregator.output_path
   source_code_hash = data.archive_file.edgar_ai_aggregator.output_base64sha256
-  memory_size      = 10240  # 10GB — needed for full-rebuild of ~11K parquets
+  memory_size      = 3008   # Lambda max — enough for incremental runs; full rebuild batches in pandas
   timeout          = 900    # 15 min
 
   layers = [local.aws_sdk_pandas_layer_arn]
