@@ -182,6 +182,14 @@ def lambda_handler(event, context):
 
     for i in range(0, len(universe), BATCH_SIZE):
         batch = universe[i : i + BATCH_SIZE]
+        # Skip companies that already have both annual AND quarterly parquets — no
+        # need to hit the EDGAR API for them at all.
+        batch = [
+            row for row in batch
+            if not (_any_parquet_exists("10-K", row["cik"]) and _any_parquet_exists("10-Q", row["cik"]))
+        ]
+        if not batch:
+            continue
         with ThreadPoolExecutor(max_workers=len(batch)) as pool:
             futs = {pool.submit(_filings_for_company, row, lookback_cutoff): row for row in batch}
             for fut in as_completed(futs):
