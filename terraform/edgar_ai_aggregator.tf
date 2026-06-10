@@ -50,13 +50,13 @@ resource "aws_iam_role_policy" "edgar_ai_aggregator" {
         ]
       },
       {
-        Sid    = "S3ListFilings"
+        Sid    = "S3ListFilingsAndPyData"
         Effect = "Allow"
         Action = ["s3:ListBucket"]
         Resource = [aws_s3_bucket.pipeline_data.arn]
         Condition = {
           StringLike = {
-            "s3:prefix" = ["data-ingress/filings/*"]
+            "s3:prefix" = ["data-ingress/filings/*", "pyData/Intermediate/*"]
           }
         }
       },

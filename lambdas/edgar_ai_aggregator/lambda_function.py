@@ -123,7 +123,8 @@ def _load_panel(key: str) -> pd.DataFrame:
         obj = _s3.get_object(Bucket=S3_BUCKET, Key=key)
         return pd.read_parquet(io.BytesIO(obj["Body"].read()))
     except ClientError as e:
-        if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
+        code = e.response["Error"]["Code"]
+        if code in ("404", "NoSuchKey", "403", "AccessDenied"):
             return pd.DataFrame()
         raise
 
