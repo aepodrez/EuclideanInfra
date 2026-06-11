@@ -123,7 +123,7 @@ resource "aws_cloudwatch_log_group" "market_data" {
 }
 
 resource "aws_lambda_function" "market_data" {
-  for_each      = local.market_data_jobs
+  for_each      = var.enable_market_data_lambdas ? local.market_data_jobs : {}
   function_name = "${var.project_name}-md-${each.key}${local.env_suffix}"
   role          = aws_iam_role.market_data.arn
   package_type  = "Image"
@@ -157,14 +157,14 @@ resource "aws_cloudwatch_event_rule" "market_data" {
 }
 
 resource "aws_cloudwatch_event_target" "market_data" {
-  for_each  = local.market_data_jobs
+  for_each  = var.enable_market_data_lambdas ? local.market_data_jobs : {}
   rule      = aws_cloudwatch_event_rule.market_data[each.key].name
   target_id = "MarketDataLambda"
   arn       = aws_lambda_function.market_data[each.key].arn
 }
 
 resource "aws_lambda_permission" "market_data_eventbridge" {
-  for_each      = local.market_data_jobs
+  for_each      = var.enable_market_data_lambdas ? local.market_data_jobs : {}
   statement_id  = "AllowEventBridgeInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.market_data[each.key].function_name
