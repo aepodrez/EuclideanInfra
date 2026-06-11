@@ -59,16 +59,6 @@ output "cloudwatch_logs_account_policy_name" {
   value       = var.enable_cloudwatch_logs_archive_to_s3 ? aws_cloudwatch_log_account_policy.all_logs_to_firehose[0].policy_name : null
 }
 
-output "edgar_filings_queue_url" {
-  description = "URL of the SQS queue for new EDGAR filing events"
-  value       = aws_sqs_queue.edgar_filings.url
-}
-
-output "edgar_filings_dlq_url" {
-  description = "URL of the dead-letter queue for failed EDGAR filing processing"
-  value       = aws_sqs_queue.edgar_filings_dlq.url
-}
-
 # SSM Parameters for child infrastructure references
 resource "aws_ssm_parameter" "s3_bucket_name" {
   name  = "/${var.project_name}${local.env_path}/s3_bucket_name"
