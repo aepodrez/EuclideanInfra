@@ -84,3 +84,10 @@ variable "openrouter_api_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "fred_api_key" {
+  description = "FRED API key for TreasuryBill3M and Fama-French risk-free rate downloads"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

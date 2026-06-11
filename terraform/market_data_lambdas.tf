@@ -108,12 +108,6 @@ resource "aws_iam_role_policy" "market_data" {
           StringLike = { "s3:prefix" = ["pyData/Intermediate/*", "Static/*"] }
         }
       },
-      {
-        Sid      = "SSMFredKey"
-        Effect   = "Allow"
-        Action   = ["ssm:GetParameter"]
-        Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/euclidean/market-data/fred-api-key"
-      },
     ]
   })
 }
@@ -142,7 +136,8 @@ resource "aws_lambda_function" "market_data" {
       S3_BUCKET     = aws_s3_bucket.pipeline_data.id
       JOB           = each.value.job
       PYDATA_PREFIX = "pyData/Intermediate"
-      UNIVERSE_KEY  = "universe.csv"
+      UNIVERSE_KEY  = "universe/universe.csv"
+      FRED_API_KEY  = var.fred_api_key
     }
   }
 

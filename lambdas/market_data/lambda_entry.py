@@ -36,7 +36,7 @@ log.setLevel(logging.INFO)
 
 S3_BUCKET      = os.environ["S3_BUCKET"]
 PYDATA_PREFIX  = os.environ.get("PYDATA_PREFIX", "pyData/Intermediate")
-UNIVERSE_KEY   = os.environ.get("UNIVERSE_KEY", "universe.csv")
+UNIVERSE_KEY   = os.environ.get("UNIVERSE_KEY", "universe/universe.csv")
 STATIC_PREFIX  = os.environ.get("STATIC_PREFIX", "Static")
 FRED_SSM_PARAM = os.environ.get("FRED_SSM_PARAM", "/euclidean/market-data/fred-api-key")
 
