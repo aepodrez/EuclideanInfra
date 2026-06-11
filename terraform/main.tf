@@ -7,7 +7,6 @@ terraform {
     }
   }
 
-  # Using local backend - can be changed to S3 for team collaboration
   backend "local" {
     path = "terraform.tfstate"
   }
