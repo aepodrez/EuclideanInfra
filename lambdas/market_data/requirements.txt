@@ -1,9 +1,0 @@
-pandas
-pyarrow
-numpy
-yfinance
-requests
-pandas_datareader
-openpyxl
-python-dotenv
-boto3

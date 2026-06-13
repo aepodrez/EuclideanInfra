@@ -85,15 +85,3 @@ variable "openrouter_api_key" {
   default     = ""
 }
 
-variable "fred_api_key" {
-  description = "FRED API key for TreasuryBill3M and Fama-French risk-free rate downloads"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "enable_market_data_lambdas" {
-  description = "Whether to create the 9 market-data Lambda functions (requires the ECR image to be pushed first). Keep false until build_and_push.sh has run."
-  type        = bool
-  default     = false
-}
