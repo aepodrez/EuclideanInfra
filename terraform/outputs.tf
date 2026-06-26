@@ -108,3 +108,10 @@ resource "aws_ssm_parameter" "ecs_security_group_id" {
   value = aws_security_group.ecs.id
   tags  = local.common_tags
 }
+
+resource "aws_ssm_parameter" "sns_notifications_arn" {
+  name  = "/${var.project_name}${local.env_path}/sns_notifications_arn"
+  type  = "String"
+  value = aws_sns_topic.pipeline_notifications.arn
+  tags  = local.common_tags
+}
