@@ -146,12 +146,14 @@ resource "aws_ecs_task_definition" "build_ff_portfolios" {
 }
 
 # ---------------------------------------------------------------------------
-# EventBridge — annual schedule: July 1 at 06:00 UTC
+# EventBridge — annual schedule: July 1 at 00:00 ET (04:00 UTC, EDT)
+# Runs at midnight ET so the 1-2h EDGAR companyfacts download finishes well before
+# fama-french-daily at 06:15 UTC needs the updated portfolio file.
 # ---------------------------------------------------------------------------
 resource "aws_cloudwatch_event_rule" "build_ff_portfolios" {
   name                = "${var.project_name}-build-ff-portfolios-annual${local.env_suffix}"
   description         = "Annual Fama-French portfolio rebalance (July 1 formation date)"
-  schedule_expression = "cron(0 6 1 7 ? *)"
+  schedule_expression = "cron(0 4 1 7 ? *)"
   tags                = local.common_tags
 }
 
