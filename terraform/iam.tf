@@ -33,6 +33,8 @@ resource "aws_iam_role_policy" "step_function" {
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-universe${local.env_suffix}",
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-alpha-model${local.env_suffix}",
           "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-execution-model${local.env_suffix}",
+          # Predictor Lambdas (signal-master + 66 predictors) invoked by the decision pipeline.
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-pred-*",
         ]
       },
       {
