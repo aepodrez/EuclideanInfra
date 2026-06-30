@@ -20,6 +20,17 @@ locals {
     "momseasonshort", "momvol", "netdebtprice", "opleverage", "operprof", "ps", "rdability",
     "rdcap", "returnskew", "streversal", "sharevol", "trendfactor", "volmkt", "volsd",
     "volumetrend", "cfp", "dnoa", "std-turn",
+    # Batch 2 — predictors wrongly excluded by the original triage (all computable from
+    # available data). Each branch is fault-tolerant, so any runtime field gap just skips.
+    "am", "bm", "chassetturnover", "chinv", "chinvia", "chnncoa", "debtissuance", "delequ",
+    "delfinl", "dellti", "delnetfin", "divomit", "divyieldst", "dolvol", "ep", "earningssurprise",
+    "entmult", "equityduration", "exchswitch", "firmage", "frontier", "gp", "herf", "herfasset",
+    "herfbe", "illiquidity", "indipo", "intmom", "invgrowth", "investment", "lrreversal", "leverage",
+    "mrreversal", "maxret", "meanrankrevgrowth", "noa", "netdebtfinance", "netequityfinance",
+    "netpayoutyield", "numearnincrease", "oscore", "operprofrd", "orderbacklog", "orderbacklogchg",
+    "payoutyield", "pctacc", "pcttotacc", "price", "rd", "rdipo", "revenuesurprise", "roe", "sp",
+    "shareiss1y", "shareiss5y", "sharerepurchase", "size", "surpriserd", "tax", "totalaccruals",
+    "varcf", "xfin", "hire", "realestate", "roaq", "tang",
   ]
 
   sfn_retry_lambda = [
