@@ -733,6 +733,27 @@ class EuclideanInfraStack(Stack):
                 },
             )
 
+            # Lets every repo's `cdk deploy` step (running as github-cicd) assume
+            # the CDK bootstrap roles for synth-time SSM lookups and the actual
+            # deploy. Standalone AWS::IAM::ManagedPolicy (not CfnPolicy/inline,
+            # unlike the two above) — github-cicd's inline-policy budget is
+            # already at the 2048-byte account limit.
+            iam.ManagedPolicy(
+                self, "GithubCicdCdkAssumeRoles",
+                managed_policy_name="euclidean-github-cicd-cdk-assume-roles",
+                users=[iam.User.from_user_name(self, "GithubCicdUserRef", "github-cicd")],
+                statements=[
+                    iam.PolicyStatement(
+                        actions=["sts:AssumeRole"],
+                        resources=[
+                            role_arn(f"cdk-hnb659fds-{r}-{ACCOUNT}-{REGION}")
+                            for r in ("deploy-role", "file-publishing-role",
+                                      "image-publishing-role", "lookup-role", "cfn-exec-role")
+                        ],
+                    ),
+                ],
+            )
+
             # ---- ECS task definitions (new revision under the same family) ----
             usaspending_task = ecs.FargateTaskDefinition(
                 self, "UsaspendingTaskDef",
