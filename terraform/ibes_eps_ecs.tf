@@ -18,9 +18,14 @@
 # ---------------------------------------------------------------------------
 
 locals {
-  refinitiv_task_family        = "${var.project_name}-data-ingress-refinitiv${local.env_suffix}"
-  refinitiv_execution_role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-data-ingress-execution-role${local.env_suffix}"
-  refinitiv_task_role_arn      = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-data-ingress-task-role${local.env_suffix}"
+  refinitiv_task_family = "${var.project_name}-data-ingress-refinitiv${local.env_suffix}"
+  # Bare-family ARN (no :revision suffix) — ECS resolves this to the latest ACTIVE
+  # revision at RunTask time, which is what we want (CI registers new revisions on
+  # every push). aws_cloudwatch_event_target.ecs_target.task_definition_arn requires
+  # a real ARN, not just the family name.
+  refinitiv_task_definition_arn = "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:task-definition/${local.refinitiv_task_family}"
+  refinitiv_execution_role_arn  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-data-ingress-execution-role${local.env_suffix}"
+  refinitiv_task_role_arn       = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project_name}-data-ingress-task-role${local.env_suffix}"
 }
 
 resource "aws_cloudwatch_event_rule" "ibes_eps" {
@@ -80,10 +85,10 @@ resource "aws_cloudwatch_event_target" "ibes_eps" {
   role_arn = aws_iam_role.ibes_eps_events.arn
 
   ecs_target {
-    # Family name (no revision) so EventBridge launches the latest ACTIVE revision
-    # registered by the DataIngressModel CI. The number of task-def revisions the
-    # role may RunTask is scoped by the ":*" ARN in the policy above.
-    task_definition_arn = local.refinitiv_task_family
+    # Bare-family ARN (no :revision) so EventBridge launches the latest ACTIVE
+    # revision registered by the DataIngressModel CI. The number of task-def
+    # revisions the role may RunTask is scoped by the ":*" ARN in the policy above.
+    task_definition_arn = local.refinitiv_task_definition_arn
     task_count          = 1
     launch_type         = "FARGATE"
 
