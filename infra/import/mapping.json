@@ -1,0 +1,131 @@
+{
+  "Vpc": {
+    "VpcId": "vpc-01adb745340a1f5db"
+  },
+  "Igw": {
+    "InternetGatewayId": "igw-0132309dae0ef36ee"
+  },
+  "PublicSubnetA": {
+    "SubnetId": "subnet-0cb23cb16a893e69b"
+  },
+  "PublicSubnetB": {
+    "SubnetId": "subnet-0c7d5564c847ec3b9"
+  },
+  "PrivateSubnetA": {
+    "SubnetId": "subnet-05a989346b1fdf225"
+  },
+  "PrivateSubnetB": {
+    "SubnetId": "subnet-07432d8f8781ee2e7"
+  },
+  "PublicRouteTable": {
+    "RouteTableId": "rtb-0a3c1d3ff0041e7e9"
+  },
+  "PrivateRouteTable": {
+    "RouteTableId": "rtb-0a57945e192594b31"
+  },
+  "EcsSecurityGroup": {
+    "Id": "sg-010ca983e1744a0f9"
+  },
+  "S3Endpoint": {
+    "Id": "vpce-05a9d647eb131eae6"
+  },
+  "PipelineDataBucket": {
+    "BucketName": "euclidean-pipeline-954976294836"
+  },
+  "NotificationsTopic": {
+    "TopicArn": "arn:aws:sns:us-east-1:954976294836:euclidean-pipeline-notifications"
+  },
+  "Cluster": {
+    "ClusterName": "euclidean-cluster"
+  },
+  "StepFunctionRoleC4BAB6F8": {
+    "RoleName": "euclidean-sfn-role"
+  },
+  "PipelineSchedulerRole7635339C": {
+    "RoleName": "euclidean-pipeline-scheduler"
+  },
+  "UsaspendingExecutionRole856A3515": {
+    "RoleName": "euclidean-usaspending-exec"
+  },
+  "UsaspendingTaskRole9467E566": {
+    "RoleName": "euclidean-usaspending-task"
+  },
+  "UsaspendingEventsRole18D38006": {
+    "RoleName": "euclidean-usaspending-events"
+  },
+  "FfExecutionRole2C9A8E27": {
+    "RoleName": "euclidean-build-ff-exec"
+  },
+  "FfTaskRole89DBDDC2": {
+    "RoleName": "euclidean-build-ff-task"
+  },
+  "FfEventsRoleB2B84A75": {
+    "RoleName": "euclidean-build-ff-events"
+  },
+  "IbesEpsEventsRoleA176D860": {
+    "RoleName": "euclidean-ibes-eps-events"
+  },
+  "FirehoseToS3Role866B62A2": {
+    "RoleName": "euclidean-firehose-cwlogs"
+  },
+  "CwLogsToFirehoseRoleBD70E507": {
+    "RoleName": "euclidean-cwlogs-to-firehose"
+  },
+  "OperatorSfnRead6BD7F2DD": {
+    "PolicyArn": "arn:aws:iam::954976294836:policy/euclidean-operator-sfn-read"
+  },
+  "StepFunctionLogGroup5D8A5468": {
+    "LogGroupName": "/aws/stepfunctions/euclidean-pipeline"
+  },
+  "UsaspendingLogGroup6C14E582": {
+    "LogGroupName": "/ecs/euclidean-usaspending"
+  },
+  "FfLogGroup81B8D5AB": {
+    "LogGroupName": "/ecs/euclidean-build-ff-portfolios"
+  },
+  "Pipeline": {
+    "Arn": "arn:aws:states:us-east-1:954976294836:stateMachine:euclidean-pipeline"
+  },
+  "CwLogsFirehose": {
+    "DeliveryStreamName": "euclidean-cwlogs-to-s3"
+  },
+  "S3BucketNameParam0896ADEA": {
+    "Name": "/euclidean/s3_bucket_name"
+  },
+  "S3BucketArnParamE9974AB7": {
+    "Name": "/euclidean/s3_bucket_arn"
+  },
+  "VpcIdParamE55A048C": {
+    "Name": "/euclidean/vpc_id"
+  },
+  "PrivateSubnetIdsParam9C245608": {
+    "Name": "/euclidean/private_subnet_ids"
+  },
+  "PublicSubnetIdsParam26DA81CB": {
+    "Name": "/euclidean/public_subnet_ids"
+  },
+  "EcsClusterArnParam1A49A8EC": {
+    "Name": "/euclidean/ecs_cluster_arn"
+  },
+  "EcsSecurityGroupIdParamDB80A983": {
+    "Name": "/euclidean/ecs_security_group_id"
+  },
+  "SnsNotificationsArnParamD79F2563": {
+    "Name": "/euclidean/sns_notifications_arn"
+  },
+  "UsaspendingRule": {
+    "Arn": "arn:aws:events:us-east-1:954976294836:rule/euclidean-usaspending-quarterly"
+  },
+  "BuildFfPortfoliosRule": {
+    "Arn": "arn:aws:events:us-east-1:954976294836:rule/euclidean-build-ff-portfolios-annual"
+  },
+  "IbesEpsRule": {
+    "Arn": "arn:aws:events:us-east-1:954976294836:rule/euclidean-ibes-eps-monthly"
+  },
+  "PipelineScheduleRule": {
+    "Arn": "arn:aws:events:us-east-1:954976294836:rule/euclidean-pipeline-schedule"
+  },
+  "PipelineStateChangeRule": {
+    "Arn": "arn:aws:events:us-east-1:954976294836:rule/euclidean-pipeline-state-change"
+  }
+}

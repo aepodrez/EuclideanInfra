@@ -1,0 +1,12 @@
+{
+  "Vpc":             {"VpcId": "vpc-01adb745340a1f5db"},
+  "Igw":             {"InternetGatewayId": "igw-0132309dae0ef36ee"},
+  "PublicSubnetA":   {"SubnetId": "subnet-0cb23cb16a893e69b"},
+  "PublicSubnetB":   {"SubnetId": "subnet-0c7d5564c847ec3b9"},
+  "PrivateSubnetA":  {"SubnetId": "subnet-05a989346b1fdf225"},
+  "PrivateSubnetB":  {"SubnetId": "subnet-07432d8f8781ee2e7"},
+  "PublicRouteTable":  {"RouteTableId": "rtb-0a3c1d3ff0041e7e9"},
+  "PrivateRouteTable": {"RouteTableId": "rtb-0a57945e192594b31"},
+  "EcsSecurityGroup":  {"Id": "sg-010ca983e1744a0f9"},
+  "S3Endpoint":        {"Id": "vpce-05a9d647eb131eae6"}
+}
