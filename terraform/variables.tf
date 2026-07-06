@@ -65,7 +65,14 @@ variable "github_cicd_iam_username" {
 }
 
 variable "notification_phone_number" {
-  description = "E.164 phone number for pipeline SMS alerts (e.g. +15551234567). Leave empty to skip SMS subscription."
+  description = "E.164 phone number for pipeline SMS alerts (e.g. +15551234567). Leave empty to skip SMS subscription. UNUSED as of the email switch below — SMS requires toll-free/10DLC carrier registration (company verification), which doesn't fit a single-recipient personal alert; kept here in case SMS is revisited later."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "notification_email" {
+  description = "Email address for pipeline alerts. Leave empty to skip the email subscription. AWS sends a confirmation link to this address after apply — it must be clicked before notifications start flowing."
   type        = string
   sensitive   = true
   default     = ""
