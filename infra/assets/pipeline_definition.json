@@ -1,1 +1,728 @@
-{"Comment":"Euclidean monthly decision pipeline: SignalMaster -\u003e predictors -\u003e alpha -\u003e portfolio","StartAt":"RunSignalMaster","States":{"AlphaModelFailed":{"Cause":"Alpha model failed, used fallback, or produced no rows.","Error":"AlphaModelFailed","Type":"Fail"},"CheckAlphaModelResult":{"Choices":[{"And":[{"NumericEquals":200,"Variable":"$.alpha_model_result.statusCode"},{"BooleanEquals":false,"Variable":"$.alpha_model_result.used_fallback"},{"NumericGreaterThan":0,"Variable":"$.alpha_model_result.row_count"}],"Next":"RunPortfolioConstruction"}],"Default":"AlphaModelFailed","Type":"Choice"},"RunAlphaModel":{"Next":"CheckAlphaModelResult","Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-alpha-model","Payload":{"data_ingress_prefix":"","execution_id.$":"$$.Execution.Id","output_key":"alpha-model/expected_returns.csv","s3_prefix":"alpha-model","universe_path":"universe/universe.csv"}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":"$.alpha_model_result","ResultSelector":{"row_count.$":"$.Payload.row_count","s3_output_path.$":"$.Payload.s3_output_path","statusCode.$":"$.Payload.statusCode","used_fallback.$":"$.Payload.used_fallback","warning.$":"$.Payload.warning"},"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"RunPortfolioConstruction":{"End":true,"Parameters":{"Cluster":"arn:aws:ecs:us-east-1:954976294836:cluster/euclidean-cluster","LaunchType":"FARGATE","NetworkConfiguration":{"AwsvpcConfiguration":{"AssignPublicIp":"ENABLED","SecurityGroups":["sg-010ca983e1744a0f9"],"Subnets":["subnet-0cb23cb16a893e69b","subnet-0c7d5564c847ec3b9"]}},"Overrides":{"ContainerOverrides":[{"Environment":[{"Name":"S3_EXPECTED_RETURNS_KEY","Value.$":"$.alpha_model_result.s3_output_path"},{"Name":"S3_UNIVERSE_KEY","Value":"universe/universe.csv"},{"Name":"S3_CRSP_PARQUET_KEY","Value":"pyData/Intermediate/dailyCRSP.parquet"},{"Name":"S3_TICKER_MAP_KEY","Value":"pyData/Intermediate/ticker_to_permno_monthly.csv"},{"Name":"S3_OUTPUT_KEY","Value":"portfolio-construction/optimal_portfolio.csv"},{"Name":"S3_OUTPUT_META_KEY","Value":"portfolio-construction/optimal_portfolio_meta.json"}],"Name":"portfolio-construction"}]},"TaskDefinition":"euclidean-portfolio-construction"},"Resource":"arn:aws:states:::ecs:runTask.sync","ResultPath":"$.portfolio_result","ResultSelector":{"s3_meta_path":"portfolio-construction/optimal_portfolio_meta.json","s3_output_path":"portfolio-construction/optimal_portfolio.csv","statusCode":200},"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":20,"MaxAttempts":0}],"Type":"Task"},"RunPredictors":{"Branches":[{"StartAt":"Run_accruals","States":{"Run_accruals":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_accruals","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-accruals","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_accruals":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_accrualsbm","States":{"Run_accrualsbm":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_accrualsbm","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-accrualsbm","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_accrualsbm":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_adexp","States":{"Run_adexp":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_adexp","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-adexp","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_adexp":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_ageipo","States":{"Run_ageipo":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_ageipo","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ageipo","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_ageipo":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_assetgrowth","States":{"Run_assetgrowth":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_assetgrowth","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-assetgrowth","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_assetgrowth":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_bmdec","States":{"Run_bmdec":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_bmdec","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bmdec","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_bmdec":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_beta","States":{"Run_beta":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_beta","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-beta","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_beta":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_bookleverage","States":{"Run_bookleverage":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_bookleverage","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bookleverage","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_bookleverage":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_brandinvest","States":{"Run_brandinvest":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_brandinvest","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-brandinvest","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_brandinvest":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_cboperprof","States":{"Run_cboperprof":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_cboperprof","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cboperprof","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_cboperprof":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_cf","States":{"Run_cf":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_cf","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cf","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_cf":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_cash","States":{"Run_cash":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_cash","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cash","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_cash":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_cashprod","States":{"Run_cashprod":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_cashprod","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cashprod","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_cashprod":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_cheq","States":{"Run_cheq":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_cheq","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cheq","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_cheq":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_chnwc","States":{"Run_chnwc":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_chnwc","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chnwc","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_chnwc":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_chtax","States":{"Run_chtax":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_chtax","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chtax","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_chtax":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_compequiss","States":{"Run_compequiss":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_compequiss","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-compequiss","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_compequiss":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_compositedebtissuance","States":{"Run_compositedebtissuance":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_compositedebtissuance","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-compositedebtissuance","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_compositedebtissuance":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_convdebt","States":{"Run_convdebt":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_convdebt","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-convdebt","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_convdebt":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_delcoa","States":{"Run_delcoa":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_delcoa","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delcoa","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_delcoa":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_delcol","States":{"Run_delcol":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_delcol","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delcol","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_delcol":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_deldrc","States":{"Run_deldrc":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_deldrc","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-deldrc","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_deldrc":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_divinit","States":{"Run_divinit":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_divinit","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divinit","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_divinit":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_divseason","States":{"Run_divseason":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_divseason","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divseason","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_divseason":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_earnsupbig","States":{"Run_earnsupbig":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_earnsupbig","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earnsupbig","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_earnsupbig":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_earningsconsistency","States":{"Run_earningsconsistency":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_earningsconsistency","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earningsconsistency","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_earningsconsistency":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_firmagemom","States":{"Run_firmagemom":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_firmagemom","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-firmagemom","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_firmagemom":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_gradexp","States":{"Run_gradexp":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_gradexp","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-gradexp","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_gradexp":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_grltnoa","States":{"Run_grltnoa":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_grltnoa","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grltnoa","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_grltnoa":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_grsaletogrinv","States":{"Run_grsaletogrinv":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_grsaletogrinv","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grsaletogrinv","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_grsaletogrinv":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_grsaletogroverhead","States":{"Run_grsaletogroverhead":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_grsaletogroverhead","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grsaletogroverhead","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_grsaletogroverhead":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_high52","States":{"Run_high52":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_high52","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-high52","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_high52":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_indmom","States":{"Run_indmom":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_indmom","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indmom","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_indmom":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_indretbig","States":{"Run_indretbig":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_indretbig","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indretbig","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_indretbig":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_investppeinv","States":{"Run_investppeinv":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_investppeinv","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-investppeinv","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_investppeinv":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_ms","States":{"Run_ms":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_ms","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ms","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_ms":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_mom12m","States":{"Run_mom12m":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_mom12m","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom12m","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_mom12m":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_mom12moffseason","States":{"Run_mom12moffseason":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_mom12moffseason","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom12moffseason","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_mom12moffseason":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_mom6m","States":{"Run_mom6m":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_mom6m","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom6m","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_mom6m":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momoffseason","States":{"Run_momoffseason":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momoffseason","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momoffseason":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momoffseason06yrplus","States":{"Run_momoffseason06yrplus":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momoffseason06yrplus","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason06yrplus","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momoffseason06yrplus":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momoffseason11yrplus","States":{"Run_momoffseason11yrplus":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momoffseason11yrplus","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason11yrplus","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momoffseason11yrplus":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momoffseason16yrplus","States":{"Run_momoffseason16yrplus":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momoffseason16yrplus","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason16yrplus","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momoffseason16yrplus":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momrev","States":{"Run_momrev":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momrev","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momrev","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momrev":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momseason","States":{"Run_momseason":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momseason","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momseason":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momseason06yrplus","States":{"Run_momseason06yrplus":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momseason06yrplus","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason06yrplus","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momseason06yrplus":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momseason11yrplus","States":{"Run_momseason11yrplus":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momseason11yrplus","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason11yrplus","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momseason11yrplus":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momseason16yrplus","States":{"Run_momseason16yrplus":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momseason16yrplus","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason16yrplus","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momseason16yrplus":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momseasonshort","States":{"Run_momseasonshort":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momseasonshort","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseasonshort","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momseasonshort":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_momvol","States":{"Run_momvol":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_momvol","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momvol","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_momvol":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_netdebtprice","States":{"Run_netdebtprice":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_netdebtprice","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netdebtprice","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_netdebtprice":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_opleverage","States":{"Run_opleverage":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_opleverage","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-opleverage","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_opleverage":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_operprof","States":{"Run_operprof":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_operprof","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-operprof","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_operprof":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_ps","States":{"Run_ps":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_ps","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ps","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_ps":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_rdability","States":{"Run_rdability":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_rdability","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdability","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_rdability":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_rdcap","States":{"Run_rdcap":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_rdcap","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdcap","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_rdcap":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_returnskew","States":{"Run_returnskew":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_returnskew","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-returnskew","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_returnskew":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_streversal","States":{"Run_streversal":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_streversal","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-streversal","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_streversal":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_sharevol","States":{"Run_sharevol":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_sharevol","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sharevol","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_sharevol":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_trendfactor","States":{"Run_trendfactor":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_trendfactor","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-trendfactor","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_trendfactor":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_volmkt","States":{"Run_volmkt":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_volmkt","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volmkt","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_volmkt":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_volsd","States":{"Run_volsd":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_volsd","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volsd","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_volsd":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_volumetrend","States":{"Run_volumetrend":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_volumetrend","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volumetrend","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_volumetrend":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_cfp","States":{"Run_cfp":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_cfp","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cfp","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_cfp":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_dnoa","States":{"Run_dnoa":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_dnoa","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dnoa","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_dnoa":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_std-turn","States":{"Run_std-turn":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_std-turn","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-std-turn","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_std-turn":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_am","States":{"Run_am":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_am","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-am","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_am":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_bm","States":{"Run_bm":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_bm","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bm","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_bm":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_chassetturnover","States":{"Run_chassetturnover":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_chassetturnover","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chassetturnover","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_chassetturnover":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_chinv","States":{"Run_chinv":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_chinv","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chinv","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_chinv":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_chinvia","States":{"Run_chinvia":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_chinvia","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chinvia","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_chinvia":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_chnncoa","States":{"Run_chnncoa":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_chnncoa","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chnncoa","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_chnncoa":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_debtissuance","States":{"Run_debtissuance":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_debtissuance","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-debtissuance","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_debtissuance":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_delequ","States":{"Run_delequ":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_delequ","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delequ","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_delequ":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_delfinl","States":{"Run_delfinl":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_delfinl","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delfinl","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_delfinl":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_dellti","States":{"Run_dellti":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_dellti","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dellti","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_dellti":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_delnetfin","States":{"Run_delnetfin":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_delnetfin","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delnetfin","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_delnetfin":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_divomit","States":{"Run_divomit":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_divomit","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divomit","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_divomit":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_divyieldst","States":{"Run_divyieldst":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_divyieldst","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divyieldst","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_divyieldst":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_dolvol","States":{"Run_dolvol":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_dolvol","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dolvol","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_dolvol":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_ep","States":{"Run_ep":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_ep","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ep","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_ep":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_earningssurprise","States":{"Run_earningssurprise":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_earningssurprise","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earningssurprise","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_earningssurprise":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_entmult","States":{"Run_entmult":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_entmult","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-entmult","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_entmult":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_equityduration","States":{"Run_equityduration":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_equityduration","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-equityduration","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_equityduration":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_exchswitch","States":{"Run_exchswitch":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_exchswitch","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-exchswitch","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_exchswitch":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_firmage","States":{"Run_firmage":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_firmage","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-firmage","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_firmage":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_frontier","States":{"Run_frontier":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_frontier","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-frontier","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_frontier":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_gp","States":{"Run_gp":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_gp","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-gp","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_gp":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_herf","States":{"Run_herf":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_herf","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herf","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_herf":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_herfasset","States":{"Run_herfasset":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_herfasset","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herfasset","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_herfasset":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_herfbe","States":{"Run_herfbe":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_herfbe","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herfbe","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_herfbe":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_illiquidity","States":{"Run_illiquidity":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_illiquidity","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-illiquidity","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_illiquidity":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_indipo","States":{"Run_indipo":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_indipo","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indipo","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_indipo":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_intmom","States":{"Run_intmom":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_intmom","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-intmom","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_intmom":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_invgrowth","States":{"Run_invgrowth":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_invgrowth","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-invgrowth","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_invgrowth":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_investment","States":{"Run_investment":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_investment","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-investment","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_investment":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_lrreversal","States":{"Run_lrreversal":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_lrreversal","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-lrreversal","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_lrreversal":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_leverage","States":{"Run_leverage":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_leverage","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-leverage","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_leverage":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_mrreversal","States":{"Run_mrreversal":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_mrreversal","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mrreversal","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_mrreversal":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_maxret","States":{"Run_maxret":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_maxret","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-maxret","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_maxret":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_meanrankrevgrowth","States":{"Run_meanrankrevgrowth":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_meanrankrevgrowth","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-meanrankrevgrowth","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_meanrankrevgrowth":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_noa","States":{"Run_noa":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_noa","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-noa","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_noa":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_netdebtfinance","States":{"Run_netdebtfinance":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_netdebtfinance","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netdebtfinance","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_netdebtfinance":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_netequityfinance","States":{"Run_netequityfinance":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_netequityfinance","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netequityfinance","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_netequityfinance":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_netpayoutyield","States":{"Run_netpayoutyield":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_netpayoutyield","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netpayoutyield","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_netpayoutyield":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_numearnincrease","States":{"Run_numearnincrease":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_numearnincrease","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-numearnincrease","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_numearnincrease":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_oscore","States":{"Run_oscore":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_oscore","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-oscore","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_oscore":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_operprofrd","States":{"Run_operprofrd":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_operprofrd","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-operprofrd","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_operprofrd":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_orderbacklog","States":{"Run_orderbacklog":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_orderbacklog","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-orderbacklog","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_orderbacklog":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_orderbacklogchg","States":{"Run_orderbacklogchg":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_orderbacklogchg","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-orderbacklogchg","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_orderbacklogchg":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_payoutyield","States":{"Run_payoutyield":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_payoutyield","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-payoutyield","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_payoutyield":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_pctacc","States":{"Run_pctacc":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_pctacc","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-pctacc","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_pctacc":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_pcttotacc","States":{"Run_pcttotacc":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_pcttotacc","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-pcttotacc","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_pcttotacc":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_price","States":{"Run_price":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_price","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-price","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_price":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_rd","States":{"Run_rd":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_rd","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rd","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_rd":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_rdipo","States":{"Run_rdipo":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_rdipo","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdipo","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_rdipo":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_revenuesurprise","States":{"Run_revenuesurprise":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_revenuesurprise","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-revenuesurprise","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_revenuesurprise":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_roe","States":{"Run_roe":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_roe","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-roe","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_roe":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_sp","States":{"Run_sp":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_sp","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sp","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_sp":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_shareiss1y","States":{"Run_shareiss1y":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_shareiss1y","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-shareiss1y","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_shareiss1y":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_shareiss5y","States":{"Run_shareiss5y":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_shareiss5y","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-shareiss5y","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_shareiss5y":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_sharerepurchase","States":{"Run_sharerepurchase":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_sharerepurchase","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sharerepurchase","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_sharerepurchase":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_size","States":{"Run_size":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_size","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-size","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_size":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_surpriserd","States":{"Run_surpriserd":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_surpriserd","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-surpriserd","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_surpriserd":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_tax","States":{"Run_tax":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_tax","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-tax","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_tax":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_totalaccruals","States":{"Run_totalaccruals":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_totalaccruals","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-totalaccruals","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_totalaccruals":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_varcf","States":{"Run_varcf":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_varcf","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-varcf","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_varcf":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_xfin","States":{"Run_xfin":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_xfin","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-xfin","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_xfin":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_hire","States":{"Run_hire":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_hire","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-hire","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_hire":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_realestate","States":{"Run_realestate":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_realestate","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-realestate","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_realestate":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_roaq","States":{"Run_roaq":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_roaq","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-roaq","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_roaq":{"End":true,"Type":"Pass"}}},{"StartAt":"Run_tang","States":{"Run_tang":{"Catch":[{"ErrorEquals":["States.ALL"],"Next":"Skip_tang","ResultPath":"$.error"}],"End":true,"Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-tang","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":null,"Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"},"Skip_tang":{"End":true,"Type":"Pass"}}}],"Next":"RunAlphaModel","ResultPath":"$.predictor_results","Type":"Parallel"},"RunSignalMaster":{"Next":"RunPredictors","Parameters":{"FunctionName":"arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-signal-master","Payload":{}},"Resource":"arn:aws:states:::lambda:invoke","ResultPath":"$.signal_master_result","Retry":[{"BackoffRate":2,"ErrorEquals":["States.ALL"],"IntervalSeconds":10,"MaxAttempts":2}],"Type":"Task"}}}
+{
+  "Comment": "Euclidean monthly decision pipeline: SignalMaster -> predictors -> alpha -> portfolio",
+  "StartAt": "RunSignalMaster",
+  "States": {
+    "AlphaModelFailed": {
+      "Cause": "Alpha model failed, used fallback, or produced no rows.",
+      "Error": "AlphaModelFailed",
+      "Type": "Fail"
+    },
+    "CheckAlphaModelResult": {
+      "Choices": [
+        {
+          "And": [
+            {
+              "NumericEquals": 200,
+              "Variable": "$.alpha_model_result.statusCode"
+            },
+            {
+              "BooleanEquals": false,
+              "Variable": "$.alpha_model_result.used_fallback"
+            },
+            {
+              "NumericGreaterThan": 0,
+              "Variable": "$.alpha_model_result.row_count"
+            }
+          ],
+          "Next": "RunPortfolioConstruction"
+        }
+      ],
+      "Default": "AlphaModelFailed",
+      "Type": "Choice"
+    },
+    "PreparePredictors": {
+      "Next": "RunPredictors",
+      "Result": [
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-accruals",
+          "predictor": "accruals"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-accrualsbm",
+          "predictor": "accrualsbm"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-adexp",
+          "predictor": "adexp"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ageipo",
+          "predictor": "ageipo"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-assetgrowth",
+          "predictor": "assetgrowth"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bmdec",
+          "predictor": "bmdec"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-beta",
+          "predictor": "beta"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bookleverage",
+          "predictor": "bookleverage"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-brandinvest",
+          "predictor": "brandinvest"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cboperprof",
+          "predictor": "cboperprof"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cf",
+          "predictor": "cf"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cash",
+          "predictor": "cash"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cashprod",
+          "predictor": "cashprod"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cheq",
+          "predictor": "cheq"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chnwc",
+          "predictor": "chnwc"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chtax",
+          "predictor": "chtax"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-compequiss",
+          "predictor": "compequiss"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-compositedebtissuance",
+          "predictor": "compositedebtissuance"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-convdebt",
+          "predictor": "convdebt"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delcoa",
+          "predictor": "delcoa"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delcol",
+          "predictor": "delcol"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-deldrc",
+          "predictor": "deldrc"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divinit",
+          "predictor": "divinit"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divseason",
+          "predictor": "divseason"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earnsupbig",
+          "predictor": "earnsupbig"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earningsconsistency",
+          "predictor": "earningsconsistency"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-firmagemom",
+          "predictor": "firmagemom"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-gradexp",
+          "predictor": "gradexp"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grltnoa",
+          "predictor": "grltnoa"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grsaletogrinv",
+          "predictor": "grsaletogrinv"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grsaletogroverhead",
+          "predictor": "grsaletogroverhead"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-high52",
+          "predictor": "high52"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indmom",
+          "predictor": "indmom"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indretbig",
+          "predictor": "indretbig"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-investppeinv",
+          "predictor": "investppeinv"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ms",
+          "predictor": "ms"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom12m",
+          "predictor": "mom12m"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom12moffseason",
+          "predictor": "mom12moffseason"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom6m",
+          "predictor": "mom6m"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason",
+          "predictor": "momoffseason"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason06yrplus",
+          "predictor": "momoffseason06yrplus"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason11yrplus",
+          "predictor": "momoffseason11yrplus"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason16yrplus",
+          "predictor": "momoffseason16yrplus"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momrev",
+          "predictor": "momrev"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason",
+          "predictor": "momseason"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason06yrplus",
+          "predictor": "momseason06yrplus"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason11yrplus",
+          "predictor": "momseason11yrplus"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason16yrplus",
+          "predictor": "momseason16yrplus"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseasonshort",
+          "predictor": "momseasonshort"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momvol",
+          "predictor": "momvol"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netdebtprice",
+          "predictor": "netdebtprice"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-opleverage",
+          "predictor": "opleverage"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-operprof",
+          "predictor": "operprof"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ps",
+          "predictor": "ps"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdability",
+          "predictor": "rdability"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdcap",
+          "predictor": "rdcap"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-returnskew",
+          "predictor": "returnskew"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-streversal",
+          "predictor": "streversal"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sharevol",
+          "predictor": "sharevol"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-trendfactor",
+          "predictor": "trendfactor"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volmkt",
+          "predictor": "volmkt"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volsd",
+          "predictor": "volsd"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volumetrend",
+          "predictor": "volumetrend"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cfp",
+          "predictor": "cfp"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dnoa",
+          "predictor": "dnoa"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-std-turn",
+          "predictor": "std-turn"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-am",
+          "predictor": "am"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bm",
+          "predictor": "bm"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chassetturnover",
+          "predictor": "chassetturnover"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chinv",
+          "predictor": "chinv"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chinvia",
+          "predictor": "chinvia"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chnncoa",
+          "predictor": "chnncoa"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-debtissuance",
+          "predictor": "debtissuance"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delequ",
+          "predictor": "delequ"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delfinl",
+          "predictor": "delfinl"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dellti",
+          "predictor": "dellti"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delnetfin",
+          "predictor": "delnetfin"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divomit",
+          "predictor": "divomit"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divyieldst",
+          "predictor": "divyieldst"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dolvol",
+          "predictor": "dolvol"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ep",
+          "predictor": "ep"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earningssurprise",
+          "predictor": "earningssurprise"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-entmult",
+          "predictor": "entmult"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-equityduration",
+          "predictor": "equityduration"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-exchswitch",
+          "predictor": "exchswitch"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-firmage",
+          "predictor": "firmage"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-frontier",
+          "predictor": "frontier"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-gp",
+          "predictor": "gp"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herf",
+          "predictor": "herf"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herfasset",
+          "predictor": "herfasset"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herfbe",
+          "predictor": "herfbe"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-illiquidity",
+          "predictor": "illiquidity"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indipo",
+          "predictor": "indipo"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-intmom",
+          "predictor": "intmom"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-invgrowth",
+          "predictor": "invgrowth"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-investment",
+          "predictor": "investment"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-lrreversal",
+          "predictor": "lrreversal"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-leverage",
+          "predictor": "leverage"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mrreversal",
+          "predictor": "mrreversal"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-maxret",
+          "predictor": "maxret"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-meanrankrevgrowth",
+          "predictor": "meanrankrevgrowth"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-noa",
+          "predictor": "noa"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netdebtfinance",
+          "predictor": "netdebtfinance"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netequityfinance",
+          "predictor": "netequityfinance"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netpayoutyield",
+          "predictor": "netpayoutyield"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-numearnincrease",
+          "predictor": "numearnincrease"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-oscore",
+          "predictor": "oscore"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-operprofrd",
+          "predictor": "operprofrd"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-orderbacklog",
+          "predictor": "orderbacklog"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-orderbacklogchg",
+          "predictor": "orderbacklogchg"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-payoutyield",
+          "predictor": "payoutyield"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-pctacc",
+          "predictor": "pctacc"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-pcttotacc",
+          "predictor": "pcttotacc"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-price",
+          "predictor": "price"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rd",
+          "predictor": "rd"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdipo",
+          "predictor": "rdipo"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-revenuesurprise",
+          "predictor": "revenuesurprise"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-roe",
+          "predictor": "roe"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sp",
+          "predictor": "sp"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-shareiss1y",
+          "predictor": "shareiss1y"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-shareiss5y",
+          "predictor": "shareiss5y"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sharerepurchase",
+          "predictor": "sharerepurchase"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-size",
+          "predictor": "size"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-surpriserd",
+          "predictor": "surpriserd"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-tax",
+          "predictor": "tax"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-totalaccruals",
+          "predictor": "totalaccruals"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-varcf",
+          "predictor": "varcf"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-xfin",
+          "predictor": "xfin"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-hire",
+          "predictor": "hire"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-realestate",
+          "predictor": "realestate"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-roaq",
+          "predictor": "roaq"
+        },
+        {
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-tang",
+          "predictor": "tang"
+        }
+      ],
+      "ResultPath": "$.predictors",
+      "Type": "Pass"
+    },
+    "RunAlphaModel": {
+      "Next": "CheckAlphaModelResult",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-alpha-model",
+        "Payload": {
+          "data_ingress_prefix": "",
+          "execution_id.$": "$$.Execution.Id",
+          "output_key": "alpha-model/expected_returns.csv",
+          "s3_prefix": "alpha-model",
+          "universe_path": "universe/universe.csv"
+        }
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.alpha_model_result",
+      "ResultSelector": {
+        "row_count.$": "$.Payload.row_count",
+        "s3_output_path.$": "$.Payload.s3_output_path",
+        "statusCode.$": "$.Payload.statusCode",
+        "used_fallback.$": "$.Payload.used_fallback",
+        "warning.$": "$.Payload.warning"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 2
+        }
+      ],
+      "Type": "Task"
+    },
+    "RunPortfolioConstruction": {
+      "End": true,
+      "Parameters": {
+        "Cluster": "arn:aws:ecs:us-east-1:954976294836:cluster/euclidean-cluster",
+        "LaunchType": "FARGATE",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "ENABLED",
+            "SecurityGroups": [
+              "sg-010ca983e1744a0f9"
+            ],
+            "Subnets": [
+              "subnet-0cb23cb16a893e69b",
+              "subnet-0c7d5564c847ec3b9"
+            ]
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Environment": [
+                {
+                  "Name": "S3_EXPECTED_RETURNS_KEY",
+                  "Value.$": "$.alpha_model_result.s3_output_path"
+                },
+                {
+                  "Name": "S3_UNIVERSE_KEY",
+                  "Value": "universe/universe.csv"
+                },
+                {
+                  "Name": "S3_CRSP_PARQUET_KEY",
+                  "Value": "pyData/Intermediate/dailyCRSP.parquet"
+                },
+                {
+                  "Name": "S3_TICKER_MAP_KEY",
+                  "Value": "pyData/Intermediate/ticker_to_permno_monthly.csv"
+                },
+                {
+                  "Name": "S3_OUTPUT_KEY",
+                  "Value": "portfolio-construction/optimal_portfolio.csv"
+                },
+                {
+                  "Name": "S3_OUTPUT_META_KEY",
+                  "Value": "portfolio-construction/optimal_portfolio_meta.json"
+                }
+              ],
+              "Name": "portfolio-construction"
+            }
+          ]
+        },
+        "TaskDefinition": "euclidean-portfolio-construction"
+      },
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "ResultPath": "$.portfolio_result",
+      "ResultSelector": {
+        "s3_meta_path": "portfolio-construction/optimal_portfolio_meta.json",
+        "s3_output_path": "portfolio-construction/optimal_portfolio.csv",
+        "statusCode": 200
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 20,
+          "MaxAttempts": 0
+        }
+      ],
+      "Type": "Task"
+    },
+    "RunPredictors": {
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "InvokePredictor",
+        "States": {
+          "InvokePredictor": {
+            "End": true,
+            "Parameters": {
+              "FunctionName.$": "$$.Map.Item.Value.function_name",
+              "Payload": {}
+            },
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "ResultPath": null,
+            "Retry": [
+              {
+                "BackoffRate": 2,
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "IntervalSeconds": 10,
+                "MaxAttempts": 2
+              }
+            ],
+            "Type": "Task"
+          }
+        }
+      },
+      "ItemsPath": "$.predictors",
+      "MaxConcurrency": 10,
+      "Next": "RunAlphaModel",
+      "ResultPath": "$.predictor_results",
+      "Type": "Map"
+    },
+    "RunSignalMaster": {
+      "Next": "PreparePredictors",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-signal-master",
+        "Payload": {}
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.signal_master_result",
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 2
+        }
+      ],
+      "Type": "Task"
+    }
+  }
+}
