@@ -202,10 +202,6 @@
           "predictor": "momoffseason11yrplus"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason16yrplus",
-          "predictor": "momoffseason16yrplus"
-        },
-        {
           "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momrev",
           "predictor": "momrev"
         },
@@ -220,10 +216,6 @@
         {
           "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason11yrplus",
           "predictor": "momseason11yrplus"
-        },
-        {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason16yrplus",
-          "predictor": "momseason16yrplus"
         },
         {
           "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseasonshort",
@@ -248,10 +240,6 @@
         {
           "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ps",
           "predictor": "ps"
-        },
-        {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdability",
-          "predictor": "rdability"
         },
         {
           "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdcap",
@@ -432,10 +420,6 @@
         {
           "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-maxret",
           "predictor": "maxret"
-        },
-        {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-meanrankrevgrowth",
-          "predictor": "meanrankrevgrowth"
         },
         {
           "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-noa",
