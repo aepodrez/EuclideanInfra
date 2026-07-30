@@ -163,6 +163,27 @@ class EuclideanInfraStack(Stack):
             self, "PipelineDataBucket",
             bucket_name=BUCKET_NAME,
             versioning_configuration=s3.CfnBucket.VersioningConfigurationProperty(status="Enabled"),
+            lifecycle_configuration=s3.CfnBucket.LifecycleConfigurationProperty(
+                rules=[
+                    s3.CfnBucket.RuleProperty(
+                        id="retain-noncurrent-versions-for-30-days",
+                        status="Enabled",
+                        prefix="",
+                        noncurrent_version_expiration=s3.CfnBucket.NoncurrentVersionExpirationProperty(
+                            noncurrent_days=30,
+                        ),
+                        abort_incomplete_multipart_upload=s3.CfnBucket.AbortIncompleteMultipartUploadProperty(
+                            days_after_initiation=7,
+                        ),
+                    ),
+                    s3.CfnBucket.RuleProperty(
+                        id="remove-expired-delete-markers",
+                        status="Enabled",
+                        prefix="",
+                        expired_object_delete_marker=True,
+                    ),
+                ]
+            ),
             bucket_encryption=s3.CfnBucket.BucketEncryptionProperty(
                 server_side_encryption_configuration=[
                     s3.CfnBucket.ServerSideEncryptionRuleProperty(
