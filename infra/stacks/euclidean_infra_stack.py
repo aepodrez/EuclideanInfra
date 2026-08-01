@@ -598,7 +598,9 @@ class EuclideanInfraStack(Stack):
             self, "IbesEpsRule",
             name="euclidean-ibes-eps-monthly",
             description="Monthly IBES EPS-estimate refresh (Adjusted + Unadjusted) on ECS Fargate",
-            schedule_expression="cron(0 5 1 * ? *)",
+            # Monthly CRSP publishes at 06:00 UTC; EPS consumes it, then the
+            # IBES/CRSP link consumes EPS at 07:00 UTC.
+            schedule_expression="cron(30 6 1 * ? *)",
             targets=None if import_mode else [
                 events.CfnRule.TargetProperty(
                     id="Target0",

@@ -663,7 +663,7 @@
           "InvokePredictor": {
             "End": true,
             "Parameters": {
-              "FunctionName.$": "$$.Map.Item.Value.function_name",
+              "FunctionName.$": "$.function_name",
               "Payload": {}
             },
             "Resource": "arn:aws:states:::lambda:invoke",
