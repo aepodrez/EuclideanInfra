@@ -238,6 +238,7 @@ class EuclideanInfraStack(Stack):
                             f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:euclidean-alpha-model",
                             f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:euclidean-execution-model",
                             f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:euclidean-pred-*",
+                            f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:euclidean-predictor-availability",
                         ],
                     ),
                     iam.PolicyStatement(
