@@ -8,10 +8,12 @@
       "Type": "Fail"
     },
     "BuildPredictorAvailability": {
-      "Next": "RunAlphaModel",
+      "Next": "CheckPredictorAvailability",
       "Parameters": {
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-predictor-availability",
-        "Payload": {}
+        "Payload": {
+          "mode": "reconcile"
+        }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
       "ResultPath": "$.predictor_availability_result",
@@ -26,6 +28,34 @@
         }
       ],
       "Type": "Task"
+    },
+    "CheckPredictorAvailability": {
+      "Choices": [
+        {
+          "And": [
+            {
+              "NumericEquals": 0,
+              "Variable": "$.predictor_availability_result.Payload.states.failed_quality"
+            },
+            {
+              "NumericGreaterThan": 0,
+              "Variable": "$.predictor_availability_result.Payload.states.active"
+            },
+            {
+              "NumericGreaterThan": 0,
+              "Variable": "$.predictor_availability_result.Payload.row_count"
+            }
+          ],
+          "Next": "RunAlphaModel"
+        }
+      ],
+      "Default": "PredictorAvailabilityFailed",
+      "Type": "Choice"
+    },
+    "PredictorAvailabilityFailed": {
+      "Cause": "Predictor availability is incomplete, failed quality, or has no active potent predictor.",
+      "Error": "PredictorAvailabilityFailed",
+      "Type": "Fail"
     },
     "CheckAlphaModelResult": {
       "Choices": [
@@ -909,6 +939,15 @@
         "StartAt": "InvokePredictor",
         "States": {
           "InvokePredictor": {
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "RecordPredictorFailure",
+                "ResultPath": "$.failure"
+              }
+            ],
             "End": true,
             "Parameters": {
               "FunctionName.$": "$.function_name",
@@ -927,6 +966,16 @@
               }
             ],
             "Type": "Task"
+          },
+          "RecordPredictorFailure": {
+            "End": true,
+            "Parameters": {
+              "failure.$": "$.failure",
+              "function_name.$": "$.function_name",
+              "predictor.$": "$.predictor",
+              "status": "failed"
+            },
+            "Type": "Pass"
           }
         }
       },
@@ -957,6 +1006,15 @@
       "Type": "Task"
     },
     "RunRIVolSpread": {
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "BuildPredictorAvailability",
+          "ResultPath": "$.rivol_spread_failure"
+        }
+      ],
       "Next": "BuildPredictorAvailability",
       "Parameters": {
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-rivolspread",
