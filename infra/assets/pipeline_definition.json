@@ -1,6 +1,6 @@
 {
   "Comment": "Euclidean monthly decision pipeline: SignalMaster -> predictors -> alpha -> portfolio",
-  "StartAt": "RunSignalMaster",
+  "StartAt": "ResolveMonthlyContext",
   "States": {
     "AlphaModelFailed": {
       "Cause": "Alpha model failed, used fallback, or produced no rows.",
@@ -12,7 +12,9 @@
       "Parameters": {
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-predictor-availability",
         "Payload": {
-          "mode": "reconcile"
+          "as_of_month.$": "$.monthly_context.as_of_month",
+          "mode": "reconcile",
+          "run_id.$": "$.monthly_context.run_id"
         }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
@@ -44,6 +46,22 @@
             {
               "NumericGreaterThan": 0,
               "Variable": "$.predictor_availability_result.Payload.row_count"
+            },
+            {
+              "NumericEqualsPath": "$.monthly_context.as_of_month",
+              "Variable": "$.predictor_availability_result.Payload.as_of_month"
+            },
+            {
+              "StringEqualsPath": "$.monthly_context.run_id",
+              "Variable": "$.predictor_availability_result.Payload.run_id"
+            },
+            {
+              "IsPresent": true,
+              "Variable": "$.predictor_availability_result.Payload.manifest_sha256"
+            },
+            {
+              "IsPresent": true,
+              "Variable": "$.predictor_availability_result.Payload.output_sha256"
             }
           ],
           "Next": "RunAlphaModel"
@@ -56,6 +74,35 @@
       "Cause": "Predictor availability is incomplete, failed quality, or has no active potent predictor.",
       "Error": "PredictorAvailabilityFailed",
       "Type": "Fail"
+    },
+    "ResolveMonthlyContext": {
+      "Next": "RunSignalMaster",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-predictor-availability",
+        "Payload": {
+          "execution_id.$": "$$.Execution.Id",
+          "mode": "context",
+          "request.$": "$"
+        }
+      },
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "ResultPath": "$.monthly_context",
+      "ResultSelector": {
+        "as_of_month.$": "$.Payload.as_of_month",
+        "run_id.$": "$.Payload.run_id",
+        "statusCode.$": "$.Payload.statusCode"
+      },
+      "Retry": [
+        {
+          "BackoffRate": 2,
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 2
+        }
+      ],
+      "Type": "Task"
     },
     "CheckAlphaModelResult": {
       "Choices": [
@@ -72,6 +119,18 @@
             {
               "NumericGreaterThan": 0,
               "Variable": "$.alpha_model_result.row_count"
+            },
+            {
+              "NumericEqualsPath": "$.monthly_context.as_of_month",
+              "Variable": "$.alpha_model_result.as_of_month"
+            },
+            {
+              "StringEqualsPath": "$.predictor_availability_result.Payload.output_sha256",
+              "Variable": "$.alpha_model_result.predictor_availability_sha256"
+            },
+            {
+              "IsPresent": true,
+              "Variable": "$.alpha_model_result.output_sha256"
             }
           ],
           "Next": "RunPortfolioConstruction"
@@ -832,9 +891,12 @@
       "Parameters": {
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-alpha-model",
         "Payload": {
+          "as_of_month.$": "$.monthly_context.as_of_month",
           "data_ingress_prefix": "",
           "execution_id.$": "$$.Execution.Id",
-          "output_key": "alpha-model/expected_returns.csv",
+          "output_key.$": "States.Format('alpha-model/runs/{}/expected_returns.csv', $.monthly_context.run_id)",
+          "predictor_availability_key.$": "$.predictor_availability_result.Payload.output",
+          "predictor_availability_sha256.$": "$.predictor_availability_result.Payload.output_sha256",
           "s3_prefix": "alpha-model",
           "universe_path": "universe/universe.csv"
         }
@@ -842,6 +904,10 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "ResultPath": "$.alpha_model_result",
       "ResultSelector": {
+        "as_of_month.$": "$.Payload.as_of_month",
+        "output_sha256.$": "$.Payload.output_sha256",
+        "predictor_availability_key.$": "$.Payload.predictor_availability_key",
+        "predictor_availability_sha256.$": "$.Payload.predictor_availability_sha256",
         "row_count.$": "$.Payload.row_count",
         "s3_output_path.$": "$.Payload.s3_output_path",
         "statusCode.$": "$.Payload.statusCode",
@@ -886,6 +952,26 @@
                   "Value.$": "$.alpha_model_result.s3_output_path"
                 },
                 {
+                  "Name": "S3_EXPECTED_RETURNS_SHA256",
+                  "Value.$": "$.alpha_model_result.output_sha256"
+                },
+                {
+                  "Name": "MONTHLY_AS_OF_MONTH",
+                  "Value.$": "States.Format('{}', $.monthly_context.as_of_month)"
+                },
+                {
+                  "Name": "MONTHLY_RUN_ID",
+                  "Value.$": "$.monthly_context.run_id"
+                },
+                {
+                  "Name": "PREDICTOR_AVAILABILITY_KEY",
+                  "Value.$": "$.predictor_availability_result.Payload.output"
+                },
+                {
+                  "Name": "PREDICTOR_AVAILABILITY_SHA256",
+                  "Value.$": "$.predictor_availability_result.Payload.output_sha256"
+                },
+                {
                   "Name": "S3_UNIVERSE_KEY",
                   "Value": "universe/universe.csv"
                 },
@@ -899,11 +985,11 @@
                 },
                 {
                   "Name": "S3_OUTPUT_KEY",
-                  "Value": "portfolio-construction/optimal_portfolio.csv"
+                  "Value.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio.csv', $.monthly_context.run_id)"
                 },
                 {
                   "Name": "S3_OUTPUT_META_KEY",
-                  "Value": "portfolio-construction/optimal_portfolio_meta.json"
+                  "Value.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio_meta.json', $.monthly_context.run_id)"
                 }
               ],
               "Name": "portfolio-construction"
@@ -915,8 +1001,6 @@
       "Resource": "arn:aws:states:::ecs:runTask.sync",
       "ResultPath": "$.portfolio_result",
       "ResultSelector": {
-        "s3_meta_path": "portfolio-construction/optimal_portfolio_meta.json",
-        "s3_output_path": "portfolio-construction/optimal_portfolio.csv",
         "statusCode": 200
       },
       "Retry": [
@@ -932,6 +1016,12 @@
       "Type": "Task"
     },
     "RunPredictors": {
+      "ItemSelector": {
+        "as_of_month.$": "$.monthly_context.as_of_month",
+        "function_name.$": "$$.Map.Item.Value.function_name",
+        "predictor.$": "$$.Map.Item.Value.predictor",
+        "run_id.$": "$.monthly_context.run_id"
+      },
       "ItemProcessor": {
         "ProcessorConfig": {
           "Mode": "INLINE"
@@ -951,7 +1041,11 @@
             "End": true,
             "Parameters": {
               "FunctionName.$": "$.function_name",
-              "Payload": {}
+              "Payload": {
+                "as_of_month.$": "$.as_of_month",
+                "predictor.$": "$.predictor",
+                "run_id.$": "$.run_id"
+              }
             },
             "Resource": "arn:aws:states:::lambda:invoke",
             "ResultPath": null,
@@ -970,9 +1064,11 @@
           "RecordPredictorFailure": {
             "End": true,
             "Parameters": {
+              "as_of_month.$": "$.as_of_month",
               "failure.$": "$.failure",
               "function_name.$": "$.function_name",
               "predictor.$": "$.predictor",
+              "run_id.$": "$.run_id",
               "status": "failed"
             },
             "Type": "Pass"
@@ -989,7 +1085,10 @@
       "Next": "PreparePredictors",
       "Parameters": {
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-signal-master",
-        "Payload": {}
+        "Payload": {
+          "as_of_month.$": "$.monthly_context.as_of_month",
+          "run_id.$": "$.monthly_context.run_id"
+        }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
       "ResultPath": "$.signal_master_result",
@@ -1018,7 +1117,11 @@
       "Next": "BuildPredictorAvailability",
       "Parameters": {
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-rivolspread",
-        "Payload": {}
+        "Payload": {
+          "as_of_month.$": "$.monthly_context.as_of_month",
+          "predictor": "ZZ1_RIVolSpread",
+          "run_id.$": "$.monthly_context.run_id"
+        }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
       "ResultPath": "$.rivol_spread_result",
