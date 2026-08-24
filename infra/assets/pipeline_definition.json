@@ -102,6 +102,7 @@
         "as_of_month.$": "$.Payload.as_of_month",
         "preflight.$": "$.Payload.preflight",
         "production_enabled.$": "$.Payload.production_enabled",
+        "quality_migration.$": "$.Payload.quality_migration",
         "portfolio_inputs": {
           "daily_crsp": {
             "key.$": "$.Payload.portfolio_inputs.daily_crsp.key",

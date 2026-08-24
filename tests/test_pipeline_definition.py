@@ -82,6 +82,9 @@ def test_monthly_context_is_resolved_once_and_pins_alpha_catalog():
         "mode": "context",
         "request.$": "$",
     }
+    assert states["ResolveMonthlyContext"]["ResultSelector"]["quality_migration.$"] == (
+        "$.Payload.quality_migration"
+    )
     alpha = states["RunAlphaModel"]["Parameters"]["Payload"]
     assert alpha["as_of_month.$"] == "$.monthly_context.as_of_month"
     assert alpha["classification_registry_key.$"] == (
