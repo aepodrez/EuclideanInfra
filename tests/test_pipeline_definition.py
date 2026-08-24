@@ -28,7 +28,6 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
     assert invoke["Parameters"]["Payload"] == {
         "as_of_month.$": "$.as_of_month",
         "preflight.$": "$.preflight",
-        "predictor.$": "$.predictor",
         "run_id.$": "$.run_id",
         "signal_master_key.$": "$.signal_master_key",
         "signal_master_sha256.$": "$.signal_master_sha256",

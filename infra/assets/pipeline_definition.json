@@ -1115,7 +1115,6 @@
               "Payload": {
                 "as_of_month.$": "$.as_of_month",
                 "preflight.$": "$.preflight",
-                "predictor.$": "$.predictor",
                 "run_id.$": "$.run_id",
                 "signal_master_key.$": "$.signal_master_key",
                 "signal_master_sha256.$": "$.signal_master_sha256"
@@ -1218,7 +1217,6 @@
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
           "preflight.$": "$.monthly_context.preflight",
-          "predictor": "ZZ1_RIVolSpread",
           "run_id.$": "$.monthly_context.run_id",
           "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
           "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256"
