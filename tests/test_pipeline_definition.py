@@ -43,6 +43,7 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
         "as_of_month.$": "$.monthly_context.as_of_month",
         "mode": "reconcile",
         "run_id.$": "$.monthly_context.run_id",
+        "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
     }
     assert availability["Next"] == "CheckPredictorAvailability"
     gate = states["CheckPredictorAvailability"]
@@ -56,6 +57,11 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
         "$.predictor_availability_result.Payload.row_count",
     } <= variables
     assert gate["Default"] == "PredictorAvailabilityFailed"
+    numeric_equals = {
+        (condition.get("Variable"), condition.get("NumericEquals"))
+        for condition in gate["Choices"][0]["And"]
+    }
+    assert ("$.predictor_availability_result.Payload.row_count", 212) in numeric_equals
 
 
 def test_monthly_context_is_resolved_once_and_pins_alpha_catalog():
@@ -70,6 +76,9 @@ def test_monthly_context_is_resolved_once_and_pins_alpha_catalog():
     }
     alpha = states["RunAlphaModel"]["Parameters"]["Payload"]
     assert alpha["as_of_month.$"] == "$.monthly_context.as_of_month"
+    assert alpha["classification_registry_key.$"] == (
+        "$.signal_master_result.Payload.classification_registry_key"
+    )
     assert alpha["predictor_availability_key.$"] == (
         "$.predictor_availability_result.Payload.output"
     )
@@ -77,6 +86,8 @@ def test_monthly_context_is_resolved_once_and_pins_alpha_catalog():
         "$.predictor_availability_result.Payload.output_sha256"
     )
     assert alpha["output_key.$"].startswith("States.Format('alpha-model/runs/")
+    assert alpha["universe_path.$"] == "$.monthly_context.portfolio_inputs.universe.key"
+    assert alpha["universe_sha256.$"] == "$.monthly_context.portfolio_inputs.universe.sha256"
 
 
 def test_alpha_gate_requires_exact_month_and_catalog_hash():
@@ -99,6 +110,25 @@ def test_alpha_gate_requires_exact_month_and_catalog_hash():
     }
 
 
+def test_signal_master_is_gated_before_predictors():
+    states = _definition()["States"]
+    assert states["RunSignalMaster"]["Next"] == "CheckSignalMaster"
+    assert states["CheckSignalMaster"]["Choices"][0]["Next"] == "PreparePredictors"
+    assert states["CheckSignalMaster"]["Default"] == "SignalMasterFailed"
+
+
+def test_preflight_skips_portfolio_and_production_defaults_fail_closed():
+    states = _definition()["States"]
+    assert states["CheckAlphaModelResult"]["Choices"][0]["Next"] == "CheckPortfolioPublication"
+    gate = states["CheckPortfolioPublication"]
+    assert gate["Choices"][0] == {
+        "BooleanEquals": True,
+        "Next": "PreflightSucceeded",
+        "Variable": "$.monthly_context.preflight",
+    }
+    assert gate["Default"] == "MonthlyProductionDisabled"
+
+
 def test_portfolio_consumes_exact_alpha_and_catalog_lineage():
     portfolio = _definition()["States"]["RunPortfolioConstruction"]
     environment = {
@@ -109,6 +139,18 @@ def test_portfolio_consumes_exact_alpha_and_catalog_lineage():
     assert environment["S3_EXPECTED_RETURNS_KEY"] == "$.alpha_model_result.s3_output_path"
     assert environment["S3_EXPECTED_RETURNS_SHA256"] == "$.alpha_model_result.output_sha256"
     assert environment["MONTHLY_RUN_ID"] == "$.monthly_context.run_id"
+    assert environment["MONTHLY_SOURCE_SNAPSHOT_SHA256"] == (
+        "$.monthly_context.source_snapshot_sha256"
+    )
+    assert environment["S3_CRSP_PARQUET_KEY"] == (
+        "$.monthly_context.portfolio_inputs.daily_crsp.key"
+    )
+    assert environment["S3_CRSP_PARQUET_SHA256"] == (
+        "$.monthly_context.portfolio_inputs.daily_crsp.sha256"
+    )
+    assert environment["S3_CLASSIFICATION_REGISTRY_KEY"] == (
+        "$.signal_master_result.Payload.classification_registry_key"
+    )
     assert environment["PREDICTOR_AVAILABILITY_KEY"] == (
         "$.predictor_availability_result.Payload.output"
     )

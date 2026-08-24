@@ -14,7 +14,8 @@
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
           "mode": "reconcile",
-          "run_id.$": "$.monthly_context.run_id"
+          "run_id.$": "$.monthly_context.run_id",
+          "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
         }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
@@ -44,8 +45,12 @@
               "Variable": "$.predictor_availability_result.Payload.states.active"
             },
             {
-              "NumericGreaterThan": 0,
+              "NumericEquals": 212,
               "Variable": "$.predictor_availability_result.Payload.row_count"
+            },
+            {
+              "NumericEquals": 212,
+              "Variable": "$.predictor_availability_result.Payload.expected_predictor_count"
             },
             {
               "NumericEqualsPath": "$.monthly_context.as_of_month",
@@ -75,6 +80,11 @@
       "Error": "PredictorAvailabilityFailed",
       "Type": "Fail"
     },
+    "SignalMasterFailed": {
+      "Cause": "SignalMaster failed quality, omitted its registry, or used mixed monthly lineage.",
+      "Error": "SignalMasterFailed",
+      "Type": "Fail"
+    },
     "ResolveMonthlyContext": {
       "Next": "RunSignalMaster",
       "Parameters": {
@@ -89,7 +99,21 @@
       "ResultPath": "$.monthly_context",
       "ResultSelector": {
         "as_of_month.$": "$.Payload.as_of_month",
+        "preflight.$": "$.Payload.preflight",
+        "production_enabled.$": "$.Payload.production_enabled",
+        "portfolio_inputs": {
+          "daily_crsp": {
+            "key.$": "$.Payload.portfolio_inputs.daily_crsp.key",
+            "sha256.$": "$.Payload.portfolio_inputs.daily_crsp.sha256"
+          },
+          "universe": {
+            "key.$": "$.Payload.portfolio_inputs.universe.key",
+            "sha256.$": "$.Payload.portfolio_inputs.universe.sha256"
+          }
+        },
         "run_id.$": "$.Payload.run_id",
+        "source_manifest_count.$": "$.Payload.source_manifest_count",
+        "source_snapshot_sha256.$": "$.Payload.source_snapshot_sha256",
         "statusCode.$": "$.Payload.statusCode"
       },
       "Retry": [
@@ -133,11 +157,35 @@
               "Variable": "$.alpha_model_result.output_sha256"
             }
           ],
-          "Next": "RunPortfolioConstruction"
+          "Next": "CheckPortfolioPublication"
         }
       ],
       "Default": "AlphaModelFailed",
       "Type": "Choice"
+    },
+    "CheckPortfolioPublication": {
+      "Choices": [
+        {
+          "BooleanEquals": true,
+          "Next": "PreflightSucceeded",
+          "Variable": "$.monthly_context.preflight"
+        },
+        {
+          "BooleanEquals": true,
+          "Next": "RunPortfolioConstruction",
+          "Variable": "$.monthly_context.production_enabled"
+        }
+      ],
+      "Default": "MonthlyProductionDisabled",
+      "Type": "Choice"
+    },
+    "PreflightSucceeded": {
+      "Type": "Succeed"
+    },
+    "MonthlyProductionDisabled": {
+      "Cause": "Monthly preflight was not requested and production publication is disabled.",
+      "Error": "MonthlyProductionDisabled",
+      "Type": "Fail"
     },
     "PreparePredictors": {
       "Next": "RunPredictors",
@@ -892,13 +940,16 @@
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-alpha-model",
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
+          "classification_registry_key.$": "$.signal_master_result.Payload.classification_registry_key",
+          "classification_registry_sha256.$": "$.signal_master_result.Payload.classification_registry_sha256",
           "data_ingress_prefix": "",
           "execution_id.$": "$$.Execution.Id",
           "output_key.$": "States.Format('alpha-model/runs/{}/expected_returns.csv', $.monthly_context.run_id)",
           "predictor_availability_key.$": "$.predictor_availability_result.Payload.output",
           "predictor_availability_sha256.$": "$.predictor_availability_result.Payload.output_sha256",
           "s3_prefix": "alpha-model",
-          "universe_path": "universe/universe.csv"
+          "universe_path.$": "$.monthly_context.portfolio_inputs.universe.key",
+          "universe_sha256.$": "$.monthly_context.portfolio_inputs.universe.sha256"
         }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
@@ -964,6 +1015,10 @@
                   "Value.$": "$.monthly_context.run_id"
                 },
                 {
+                  "Name": "MONTHLY_SOURCE_SNAPSHOT_SHA256",
+                  "Value.$": "$.monthly_context.source_snapshot_sha256"
+                },
+                {
                   "Name": "PREDICTOR_AVAILABILITY_KEY",
                   "Value.$": "$.predictor_availability_result.Payload.output"
                 },
@@ -973,15 +1028,27 @@
                 },
                 {
                   "Name": "S3_UNIVERSE_KEY",
-                  "Value": "universe/universe.csv"
+                  "Value.$": "$.monthly_context.portfolio_inputs.universe.key"
+                },
+                {
+                  "Name": "S3_UNIVERSE_SHA256",
+                  "Value.$": "$.monthly_context.portfolio_inputs.universe.sha256"
                 },
                 {
                   "Name": "S3_CRSP_PARQUET_KEY",
-                  "Value": "pyData/Intermediate/dailyCRSP.parquet"
+                  "Value.$": "$.monthly_context.portfolio_inputs.daily_crsp.key"
                 },
                 {
-                  "Name": "S3_TICKER_MAP_KEY",
-                  "Value": "pyData/Intermediate/ticker_to_permno_monthly.csv"
+                  "Name": "S3_CRSP_PARQUET_SHA256",
+                  "Value.$": "$.monthly_context.portfolio_inputs.daily_crsp.sha256"
+                },
+                {
+                  "Name": "S3_CLASSIFICATION_REGISTRY_KEY",
+                  "Value.$": "$.signal_master_result.Payload.classification_registry_key"
+                },
+                {
+                  "Name": "S3_CLASSIFICATION_REGISTRY_SHA256",
+                  "Value.$": "$.signal_master_result.Payload.classification_registry_sha256"
                 },
                 {
                   "Name": "S3_OUTPUT_KEY",
@@ -1082,7 +1149,7 @@
       "Type": "Map"
     },
     "RunSignalMaster": {
-      "Next": "PreparePredictors",
+      "Next": "CheckSignalMaster",
       "Parameters": {
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-signal-master",
         "Payload": {
@@ -1103,6 +1170,29 @@
         }
       ],
       "Type": "Task"
+    },
+    "CheckSignalMaster": {
+      "Choices": [
+        {
+          "And": [
+            {
+              "NumericEquals": 200,
+              "Variable": "$.signal_master_result.Payload.statusCode"
+            },
+            {
+              "StringEqualsPath": "$.monthly_context.run_id",
+              "Variable": "$.signal_master_result.Payload.run_id"
+            },
+            {
+              "IsPresent": true,
+              "Variable": "$.signal_master_result.Payload.manifest_sha256"
+            }
+          ],
+          "Next": "PreparePredictors"
+        }
+      ],
+      "Default": "SignalMasterFailed",
+      "Type": "Choice"
     },
     "RunRIVolSpread": {
       "Catch": [
