@@ -50,6 +50,7 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
         "as_of_month.$": "$.monthly_context.as_of_month",
         "mode": "reconcile",
         "preflight.$": "$.monthly_context.preflight",
+        "predictor_results.$": "$.predictor_results",
         "run_id.$": "$.monthly_context.run_id",
         "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
     }
@@ -85,6 +86,9 @@ def test_monthly_context_is_resolved_once_and_pins_alpha_catalog():
     assert states["ResolveMonthlyContext"]["ResultSelector"]["quality_migration.$"] == (
         "$.Payload.quality_migration"
     )
+    assert states["BuildPredictorAvailability"]["Parameters"]["Payload"][
+        "predictor_results.$"
+    ] == "$.predictor_results"
     alpha = states["RunAlphaModel"]["Parameters"]["Payload"]
     assert alpha["as_of_month.$"] == "$.monthly_context.as_of_month"
     assert alpha["classification_registry_key.$"] == (

@@ -15,6 +15,7 @@
           "as_of_month.$": "$.monthly_context.as_of_month",
           "mode": "reconcile",
           "preflight.$": "$.monthly_context.preflight",
+          "predictor_results.$": "$.predictor_results",
           "run_id.$": "$.monthly_context.run_id",
           "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
         }
