@@ -19,13 +19,19 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
     assert item_selector == {
         "as_of_month.$": "$.monthly_context.as_of_month",
         "function_name.$": "$$.Map.Item.Value.function_name",
+        "preflight.$": "$.monthly_context.preflight",
         "predictor.$": "$$.Map.Item.Value.predictor",
         "run_id.$": "$.monthly_context.run_id",
+        "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
+        "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
     }
     assert invoke["Parameters"]["Payload"] == {
         "as_of_month.$": "$.as_of_month",
+        "preflight.$": "$.preflight",
         "predictor.$": "$.predictor",
         "run_id.$": "$.run_id",
+        "signal_master_key.$": "$.signal_master_key",
+        "signal_master_sha256.$": "$.signal_master_sha256",
     }
     assert invoke["Catch"] == [{
         "ErrorEquals": ["States.ALL"],
@@ -42,6 +48,7 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
     assert availability["Parameters"]["Payload"] == {
         "as_of_month.$": "$.monthly_context.as_of_month",
         "mode": "reconcile",
+        "preflight.$": "$.monthly_context.preflight",
         "run_id.$": "$.monthly_context.run_id",
         "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
     }
@@ -113,6 +120,9 @@ def test_alpha_gate_requires_exact_month_and_catalog_hash():
 def test_signal_master_is_gated_before_predictors():
     states = _definition()["States"]
     assert states["RunSignalMaster"]["Next"] == "CheckSignalMaster"
+    assert states["RunSignalMaster"]["Parameters"]["Payload"]["preflight.$"] == (
+        "$.monthly_context.preflight"
+    )
     assert states["CheckSignalMaster"]["Choices"][0]["Next"] == "PreparePredictors"
     assert states["CheckSignalMaster"]["Default"] == "SignalMasterFailed"
 

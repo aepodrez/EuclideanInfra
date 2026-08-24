@@ -14,6 +14,7 @@
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
           "mode": "reconcile",
+          "preflight.$": "$.monthly_context.preflight",
           "run_id.$": "$.monthly_context.run_id",
           "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
         }
@@ -1086,8 +1087,11 @@
       "ItemSelector": {
         "as_of_month.$": "$.monthly_context.as_of_month",
         "function_name.$": "$$.Map.Item.Value.function_name",
+        "preflight.$": "$.monthly_context.preflight",
         "predictor.$": "$$.Map.Item.Value.predictor",
-        "run_id.$": "$.monthly_context.run_id"
+        "run_id.$": "$.monthly_context.run_id",
+        "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
+        "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256"
       },
       "ItemProcessor": {
         "ProcessorConfig": {
@@ -1110,8 +1114,11 @@
               "FunctionName.$": "$.function_name",
               "Payload": {
                 "as_of_month.$": "$.as_of_month",
+                "preflight.$": "$.preflight",
                 "predictor.$": "$.predictor",
-                "run_id.$": "$.run_id"
+                "run_id.$": "$.run_id",
+                "signal_master_key.$": "$.signal_master_key",
+                "signal_master_sha256.$": "$.signal_master_sha256"
               }
             },
             "Resource": "arn:aws:states:::lambda:invoke",
@@ -1154,6 +1161,7 @@
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-signal-master",
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
+          "preflight.$": "$.monthly_context.preflight",
           "run_id.$": "$.monthly_context.run_id"
         }
       },
@@ -1209,8 +1217,11 @@
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-rivolspread",
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
+          "preflight.$": "$.monthly_context.preflight",
           "predictor": "ZZ1_RIVolSpread",
-          "run_id.$": "$.monthly_context.run_id"
+          "run_id.$": "$.monthly_context.run_id",
+          "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
+          "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256"
         }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
