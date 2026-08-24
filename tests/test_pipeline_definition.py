@@ -21,6 +21,7 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
         "function_name.$": "$$.Map.Item.Value.function_name",
         "preflight.$": "$.monthly_context.preflight",
         "predictor.$": "$$.Map.Item.Value.predictor",
+        "quality_migration.$": "$.monthly_context.quality_migration",
         "run_id.$": "$.monthly_context.run_id",
         "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
         "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
@@ -28,6 +29,7 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
     assert invoke["Parameters"]["Payload"] == {
         "as_of_month.$": "$.as_of_month",
         "preflight.$": "$.preflight",
+        "quality_migration.$": "$.quality_migration",
         "run_id.$": "$.run_id",
         "signal_master_key.$": "$.signal_master_key",
         "signal_master_sha256.$": "$.signal_master_sha256",
