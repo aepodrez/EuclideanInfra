@@ -135,13 +135,13 @@ def test_signal_master_is_gated_before_predictors():
     assert states["CheckSignalMaster"]["Default"] == "SignalMasterFailed"
 
 
-def test_preflight_skips_portfolio_and_production_defaults_fail_closed():
+def test_preflight_runs_isolated_portfolio_and_production_defaults_fail_closed():
     states = _definition()["States"]
     assert states["CheckAlphaModelResult"]["Choices"][0]["Next"] == "CheckPortfolioPublication"
     gate = states["CheckPortfolioPublication"]
     assert gate["Choices"][0] == {
         "BooleanEquals": True,
-        "Next": "PreflightSucceeded",
+        "Next": "RunPortfolioConstruction",
         "Variable": "$.monthly_context.preflight",
     }
     assert gate["Default"] == "MonthlyProductionDisabled"

@@ -170,7 +170,7 @@
       "Choices": [
         {
           "BooleanEquals": true,
-          "Next": "PreflightSucceeded",
+          "Next": "RunPortfolioConstruction",
           "Variable": "$.monthly_context.preflight"
         },
         {
@@ -181,9 +181,6 @@
       ],
       "Default": "MonthlyProductionDisabled",
       "Type": "Choice"
-    },
-    "PreflightSucceeded": {
-      "Type": "Succeed"
     },
     "MonthlyProductionDisabled": {
       "Cause": "Monthly preflight was not requested and production publication is disabled.",
