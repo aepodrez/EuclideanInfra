@@ -3,10 +3,19 @@ from pathlib import Path
 
 
 DEFINITION = Path(__file__).parents[1] / "infra" / "assets" / "pipeline_definition.json"
+INFRA_STACK = (
+    Path(__file__).parents[1] / "infra" / "stacks" / "euclidean_infra_stack.py"
+)
 
 
 def _definition():
     return json.loads(DEFINITION.read_text())
+
+
+def test_ibes_event_role_can_pass_the_scoped_refinitiv_runtime_role():
+    source = INFRA_STACK.read_text()
+
+    assert 'role_arn("euclidean-data-ingress-task-role-refinitiv-runtime")' in source
 
 
 def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():

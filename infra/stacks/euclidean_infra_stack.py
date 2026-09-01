@@ -408,6 +408,7 @@ class EuclideanInfraStack(Stack):
                         resources=[
                             role_arn("euclidean-data-ingress-execution-role"),
                             role_arn("euclidean-data-ingress-task-role"),
+                            role_arn("euclidean-data-ingress-task-role-refinitiv-runtime"),
                         ],
                         conditions={"StringEquals": {"iam:PassedToService": "ecs-tasks.amazonaws.com"}},
                     ),
