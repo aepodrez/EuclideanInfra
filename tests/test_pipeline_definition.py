@@ -23,25 +23,29 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
     processor = definition["States"]["RunPredictors"]["ItemProcessor"]["States"]
     invoke = processor["InvokePredictor"]
 
-    assert invoke["Parameters"]["FunctionName.$"] == "$.function_name"
+    assert invoke["Parameters"]["FunctionName"] == (
+        "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker"
+    )
     item_selector = definition["States"]["RunPredictors"]["ItemSelector"]
     assert item_selector == {
         "as_of_month.$": "$.monthly_context.as_of_month",
-        "function_name.$": "$$.Map.Item.Value.function_name",
         "preflight.$": "$.monthly_context.preflight",
         "predictor.$": "$$.Map.Item.Value.predictor",
         "quality_migration.$": "$.monthly_context.quality_migration",
         "run_id.$": "$.monthly_context.run_id",
         "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
         "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+        "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
     }
     assert invoke["Parameters"]["Payload"] == {
         "as_of_month.$": "$.as_of_month",
         "preflight.$": "$.preflight",
+        "predictor.$": "$.predictor",
         "quality_migration.$": "$.quality_migration",
         "run_id.$": "$.run_id",
         "signal_master_key.$": "$.signal_master_key",
         "signal_master_sha256.$": "$.signal_master_sha256",
+        "source_snapshot_sha256.$": "$.source_snapshot_sha256",
     }
     assert invoke["Catch"] == [{
         "ErrorEquals": ["States.ALL"],
@@ -49,6 +53,11 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
         "ResultPath": "$.failure",
     }]
     assert processor["RecordPredictorFailure"]["Type"] == "Pass"
+    assert definition["States"]["RunPredictors"]["Next"] == "InitializeRIVolStatus"
+    assert definition["States"]["MarkRIVolFailed"]["Result"] == {
+        "status": "failed",
+        "predictor": "ZZ1_RIVolSpread",
+    }
 
 
 def test_availability_reconciliation_gates_alpha_on_potent_catalog():
@@ -60,6 +69,7 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
         "mode": "reconcile",
         "preflight.$": "$.monthly_context.preflight",
         "predictor_results.$": "$.predictor_results",
+        "rivol_status.$": "$.rivol_status",
         "run_id.$": "$.monthly_context.run_id",
         "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
     }
@@ -140,20 +150,49 @@ def test_signal_master_is_gated_before_predictors():
     assert states["RunSignalMaster"]["Parameters"]["Payload"]["preflight.$"] == (
         "$.monthly_context.preflight"
     )
+    assert states["RunSignalMaster"]["Parameters"]["Payload"][
+        "source_snapshot_sha256.$"
+    ] == "$.monthly_context.source_snapshot_sha256"
     assert states["CheckSignalMaster"]["Choices"][0]["Next"] == "PreparePredictors"
     assert states["CheckSignalMaster"]["Default"] == "SignalMasterFailed"
 
 
-def test_preflight_runs_isolated_portfolio_and_production_defaults_fail_closed():
+def test_preflight_stops_before_alpha_and_production_defaults_fail_closed():
     states = _definition()["States"]
+    assert states["CheckPredictorAvailability"]["Choices"][0]["Next"] == (
+        "CheckPreflightComplete"
+    )
+    assert states["CheckPreflightComplete"]["Choices"][0] == {
+        "BooleanEquals": True,
+        "Next": "PreflightComplete",
+        "Variable": "$.monthly_context.preflight",
+    }
+    assert states["CheckPreflightComplete"]["Default"] == "RunAlphaModel"
+    assert states["PreflightComplete"] == {"Type": "Succeed"}
     assert states["CheckAlphaModelResult"]["Choices"][0]["Next"] == "CheckPortfolioPublication"
     gate = states["CheckPortfolioPublication"]
     assert gate["Choices"][0] == {
         "BooleanEquals": True,
         "Next": "RunPortfolioConstruction",
-        "Variable": "$.monthly_context.preflight",
+        "Variable": "$.monthly_context.production_enabled",
     }
     assert gate["Default"] == "MonthlyProductionDisabled"
+
+
+def test_shared_worker_receives_exact_case_sensitive_producers():
+    states = _definition()["States"]
+    items = states["PreparePredictors"]["Result"]
+
+    assert len(items) == 185
+    assert len({item["predictor"] for item in items}) == 185
+    assert {item["function_name"] for item in items} == {
+        "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker"
+    }
+    assert "Accruals" in {item["predictor"] for item in items}
+    assert "accruals" not in {item["predictor"] for item in items}
+    assert states["RunRIVolSpread"]["Parameters"]["Payload"]["predictor"] == (
+        "ZZ1_RIVolSpread"
+    )
 
 
 def test_portfolio_consumes_exact_alpha_and_catalog_lineage():

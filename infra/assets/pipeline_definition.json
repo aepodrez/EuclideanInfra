@@ -17,7 +17,8 @@
           "preflight.$": "$.monthly_context.preflight",
           "predictor_results.$": "$.predictor_results",
           "run_id.$": "$.monthly_context.run_id",
-          "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
+          "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
+          "rivol_status.$": "$.rivol_status"
         }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
@@ -71,7 +72,7 @@
               "Variable": "$.predictor_availability_result.Payload.output_sha256"
             }
           ],
-          "Next": "RunAlphaModel"
+          "Next": "CheckPreflightComplete"
         }
       ],
       "Default": "PredictorAvailabilityFailed",
@@ -117,7 +118,8 @@
         "run_id.$": "$.Payload.run_id",
         "source_manifest_count.$": "$.Payload.source_manifest_count",
         "source_snapshot_sha256.$": "$.Payload.source_snapshot_sha256",
-        "statusCode.$": "$.Payload.statusCode"
+        "statusCode.$": "$.Payload.statusCode",
+        "predictor_policy_version.$": "$.Payload.predictor_policy_version"
       },
       "Retry": [
         {
@@ -169,14 +171,9 @@
     "CheckPortfolioPublication": {
       "Choices": [
         {
+          "Variable": "$.monthly_context.production_enabled",
           "BooleanEquals": true,
-          "Next": "RunPortfolioConstruction",
-          "Variable": "$.monthly_context.preflight"
-        },
-        {
-          "BooleanEquals": true,
-          "Next": "RunPortfolioConstruction",
-          "Variable": "$.monthly_context.production_enabled"
+          "Next": "RunPortfolioConstruction"
         }
       ],
       "Default": "MonthlyProductionDisabled",
@@ -191,744 +188,744 @@
       "Next": "RunPredictors",
       "Result": [
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-accruals",
-          "predictor": "accruals"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Accruals"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-accrualsbm",
-          "predictor": "accrualsbm"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "AccrualsBM"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-adexp",
-          "predictor": "adexp"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "AdExp"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ageipo",
-          "predictor": "ageipo"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "AgeIPO"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-am",
-          "predictor": "am"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "AM"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-analystrevision",
-          "predictor": "analystrevision"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "AnalystRevision"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-assetgrowth",
-          "predictor": "assetgrowth"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "AssetGrowth"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-beta",
-          "predictor": "beta"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Beta"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-betaliquidityps",
-          "predictor": "betaliquidityps"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "BetaLiquidityPS"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-betatailrisk",
-          "predictor": "betatailrisk"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "BetaTailRisk"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bidaskspread",
-          "predictor": "bidaskspread"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "BidAskSpread"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bm",
-          "predictor": "bm"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "BM"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bmdec",
-          "predictor": "bmdec"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "BMdec"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-bookleverage",
-          "predictor": "bookleverage"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "BookLeverage"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-brandinvest",
-          "predictor": "brandinvest"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "BrandInvest"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cash",
-          "predictor": "cash"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Cash"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cashprod",
-          "predictor": "cashprod"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "CashProd"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cboperprof",
-          "predictor": "cboperprof"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "CBOperProf"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cf",
-          "predictor": "cf"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "CF"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cfp",
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
           "predictor": "cfp"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-changeinrecommendation",
-          "predictor": "changeinrecommendation"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChangeInRecommendation"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chassetturnover",
-          "predictor": "chassetturnover"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChAssetTurnover"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cheq",
-          "predictor": "cheq"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChEQ"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chforecastaccrual",
-          "predictor": "chforecastaccrual"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChForecastAccrual"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chinv",
-          "predictor": "chinv"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChInv"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chinvia",
-          "predictor": "chinvia"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChInvIA"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chnanalyst",
-          "predictor": "chnanalyst"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChNAnalyst"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chnncoa",
-          "predictor": "chnncoa"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChNNCOA"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chnwc",
-          "predictor": "chnwc"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChNWC"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-chtax",
-          "predictor": "chtax"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ChTax"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-compequiss",
-          "predictor": "compequiss"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "CompEquIss"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-compositedebtissuance",
-          "predictor": "compositedebtissuance"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "CompositeDebtIssuance"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-consrecomm",
-          "predictor": "consrecomm"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ConsRecomm"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-convdebt",
-          "predictor": "convdebt"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ConvDebt"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-coskewacx",
-          "predictor": "coskewacx"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "CoskewACX"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-coskewness",
-          "predictor": "coskewness"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Coskewness"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-cpvolspread",
-          "predictor": "cpvolspread"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "CPVolSpread"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-customermomentum",
-          "predictor": "customermomentum"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "CustomerMomentum"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dcpvolspread",
-          "predictor": "dcpvolspread"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "dCPVolSpread"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-debtissuance",
-          "predictor": "debtissuance"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DebtIssuance"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delbreadth",
-          "predictor": "delbreadth"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DelBreadth"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delcoa",
-          "predictor": "delcoa"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DelCOA"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delcol",
-          "predictor": "delcol"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DelCOL"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-deldrc",
-          "predictor": "deldrc"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DelDRC"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delequ",
-          "predictor": "delequ"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DelEqu"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delfinl",
-          "predictor": "delfinl"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DelFINL"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dellti",
-          "predictor": "dellti"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DelLTI"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-delnetfin",
-          "predictor": "delnetfin"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DelNetFin"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divinit",
-          "predictor": "divinit"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DivInit"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divomit",
-          "predictor": "divomit"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DivOmit"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divseason",
-          "predictor": "divseason"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DivSeason"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-divyieldst",
-          "predictor": "divyieldst"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DivYieldST"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dnoa",
-          "predictor": "dnoa"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "dNoa"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dolvol",
-          "predictor": "dolvol"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DolVol"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-downrecomm",
-          "predictor": "downrecomm"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "DownRecomm"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dvolcall",
-          "predictor": "dvolcall"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "dVolCall"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-dvolput",
-          "predictor": "dvolput"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "dVolPut"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earningsconsistency",
-          "predictor": "earningsconsistency"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "EarningsConsistency"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earningsforecastdisparity",
-          "predictor": "earningsforecastdisparity"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "EarningsForecastDisparity"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earningsstreak",
-          "predictor": "earningsstreak"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "EarningsStreak"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earningssurprise",
-          "predictor": "earningssurprise"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "EarningsSurprise"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-earnsupbig",
-          "predictor": "earnsupbig"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "EarnSupBig"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-entmult",
-          "predictor": "entmult"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "EntMult"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ep",
-          "predictor": "ep"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "EP"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-equityduration",
-          "predictor": "equityduration"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "EquityDuration"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-exchswitch",
-          "predictor": "exchswitch"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ExchSwitch"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-exclexp",
-          "predictor": "exclexp"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ExclExp"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-feps",
-          "predictor": "feps"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "FEPS"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-fgr5yrlag",
-          "predictor": "fgr5yrlag"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "fgr5yrLag"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-firmage",
-          "predictor": "firmage"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "FirmAge"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-firmagemom",
-          "predictor": "firmagemom"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "FirmAgeMom"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-forecastdispersion",
-          "predictor": "forecastdispersion"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ForecastDispersion"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-frontier",
-          "predictor": "frontier"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Frontier"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-gp",
-          "predictor": "gp"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "GP"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-gradexp",
-          "predictor": "gradexp"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "GrAdExp"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grltnoa",
-          "predictor": "grltnoa"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "GrLTNOA"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grsaletogrinv",
-          "predictor": "grsaletogrinv"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "GrSaleToGrInv"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-grsaletogroverhead",
-          "predictor": "grsaletogroverhead"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "GrSaleToGrOverhead"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herf",
-          "predictor": "herf"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Herf"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herfasset",
-          "predictor": "herfasset"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "HerfAsset"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-herfbe",
-          "predictor": "herfbe"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "HerfBE"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-high52",
-          "predictor": "high52"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "High52"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-hire",
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
           "predictor": "hire"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-illiquidity",
-          "predictor": "illiquidity"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Illiquidity"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indipo",
-          "predictor": "indipo"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "IndIPO"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indmom",
-          "predictor": "indmom"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "IndMom"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-indretbig",
-          "predictor": "indretbig"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "IndRetBig"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-intmom",
-          "predictor": "intmom"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "IntMom"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-investment",
-          "predictor": "investment"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Investment"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-investppeinv",
-          "predictor": "investppeinv"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "InvestPPEInv"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-invgrowth",
-          "predictor": "invgrowth"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "InvGrowth"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-io-shortinterest",
-          "predictor": "io_shortinterest"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "IO_ShortInterest"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-leverage",
-          "predictor": "leverage"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Leverage"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-lrreversal",
-          "predictor": "lrreversal"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "LRreversal"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-maxret",
-          "predictor": "maxret"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MaxRet"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-meanrankrevgrowth",
-          "predictor": "meanrankrevgrowth"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MeanRankRevGrowth"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom12m",
-          "predictor": "mom12m"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Mom12m"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom12moffseason",
-          "predictor": "mom12moffseason"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Mom12mOffSeason"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mom6m",
-          "predictor": "mom6m"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Mom6m"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason",
-          "predictor": "momoffseason"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomOffSeason"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason06yrplus",
-          "predictor": "momoffseason06yrplus"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomOffSeason06YrPlus"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason11yrplus",
-          "predictor": "momoffseason11yrplus"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomOffSeason11YrPlus"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momoffseason16yrplus",
-          "predictor": "momoffseason16yrplus"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomOffSeason16YrPlus"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momrev",
-          "predictor": "momrev"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomRev"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason",
-          "predictor": "momseason"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomSeason"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason06yrplus",
-          "predictor": "momseason06yrplus"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomSeason06YrPlus"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason11yrplus",
-          "predictor": "momseason11yrplus"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomSeason11YrPlus"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseason16yrplus",
-          "predictor": "momseason16yrplus"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomSeason16YrPlus"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momseasonshort",
-          "predictor": "momseasonshort"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomSeasonShort"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-momvol",
-          "predictor": "momvol"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MomVol"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-mrreversal",
-          "predictor": "mrreversal"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MRreversal"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ms",
-          "predictor": "ms"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "MS"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netdebtfinance",
-          "predictor": "netdebtfinance"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "NetDebtFinance"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netdebtprice",
-          "predictor": "netdebtprice"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "NetDebtPrice"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netequityfinance",
-          "predictor": "netequityfinance"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "NetEquityFinance"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-netpayoutyield",
-          "predictor": "netpayoutyield"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "NetPayoutYield"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-noa",
-          "predictor": "noa"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "NOA"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-numearnincrease",
-          "predictor": "numearnincrease"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "NumEarnIncrease"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-operprof",
-          "predictor": "operprof"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "OperProf"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-operprofrd",
-          "predictor": "operprofrd"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "OperProfRD"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-opleverage",
-          "predictor": "opleverage"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "OPLeverage"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-orderbacklog",
-          "predictor": "orderbacklog"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "OrderBacklog"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-orderbacklogchg",
-          "predictor": "orderbacklogchg"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "OrderBacklogChg"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-oscore",
-          "predictor": "oscore"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "OScore"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-payoutyield",
-          "predictor": "payoutyield"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "PayoutYield"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-pctacc",
-          "predictor": "pctacc"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "PctAcc"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-pcttotacc",
-          "predictor": "pcttotacc"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "PctTotAcc"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-price",
-          "predictor": "price"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Price"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-ps",
-          "predictor": "ps"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "PS"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rd",
-          "predictor": "rd"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "RD"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdability",
-          "predictor": "rdability"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "RDAbility"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdcap",
-          "predictor": "rdcap"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "RDcap"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rdipo",
-          "predictor": "rdipo"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "RDIPO"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rds",
-          "predictor": "rds"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "RDS"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-realestate",
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
           "predictor": "realestate"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-recomm-shortinterest",
-          "predictor": "recomm_shortinterest"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Recomm_ShortInterest"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-retconglomerate",
-          "predictor": "retconglomerate"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "retConglomerate"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-returnskew",
-          "predictor": "returnskew"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ReturnSkew"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-rev6",
-          "predictor": "rev6"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "REV6"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-revenuesurprise",
-          "predictor": "revenuesurprise"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "RevenueSurprise"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-roaq",
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
           "predictor": "roaq"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-roe",
-          "predictor": "roe"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "RoE"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sfe",
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
           "predictor": "sfe"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-shareiss1y",
-          "predictor": "shareiss1y"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ShareIss1Y"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-shareiss5y",
-          "predictor": "shareiss5y"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ShareIss5Y"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sharerepurchase",
-          "predictor": "sharerepurchase"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ShareRepurchase"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sharevol",
-          "predictor": "sharevol"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ShareVol"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-shortinterest",
-          "predictor": "shortinterest"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ShortInterest"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sinalgo",
-          "predictor": "sinalgo"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "sinAlgo"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-size",
-          "predictor": "size"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Size"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-skew1",
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
           "predictor": "skew1"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-smileslope",
-          "predictor": "smileslope"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "SmileSlope"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-sp",
-          "predictor": "sp"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "SP"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-spinoff",
-          "predictor": "spinoff"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Spinoff"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-std-turn",
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
           "predictor": "std_turn"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-streversal",
-          "predictor": "streversal"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "STreversal"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-surpriserd",
-          "predictor": "surpriserd"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "SurpriseRD"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-tang",
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
           "predictor": "tang"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-tax",
-          "predictor": "tax"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "Tax"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-totalaccruals",
-          "predictor": "totalaccruals"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "TotalAccruals"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-trendfactor",
-          "predictor": "trendfactor"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "TrendFactor"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-uprecomm",
-          "predictor": "uprecomm"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "UpRecomm"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-varcf",
-          "predictor": "varcf"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "VarCF"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volmkt",
-          "predictor": "volmkt"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "VolMkt"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volsd",
-          "predictor": "volsd"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "VolSD"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-volumetrend",
-          "predictor": "volumetrend"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "VolumeTrend"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-xfin",
-          "predictor": "xfin"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "XFIN"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz0-realizedvol-idiovol3f-returnskew3f",
-          "predictor": "zz0_realizedvol_idiovol3f_returnskew3f"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ0_RealizedVol_IdioVol3F_ReturnSkew3F"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-analystvalue-aop-predictedfe-intrinsicvalue",
-          "predictor": "zz1_analystvalue_aop_predictedfe_intrinsicvalue"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_AnalystValue_AOP_PredictedFE_IntrinsicValue"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-ebm-bpebm",
-          "predictor": "zz1_ebm_bpebm"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_EBM_BPEBM"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-fr-frbook",
-          "predictor": "zz1_fr_frbook"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_FR_FRbook"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-grcapx-grcapx1y-grcapx3y",
-          "predictor": "zz1_grcapx_grcapx1y_grcapx3y"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_grcapx_grcapx1y_grcapx3y"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-intanbm-intansp-intancfp-intanep",
-          "predictor": "zz1_intanbm_intansp_intancfp_intanep"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_IntanBM_IntanSP_IntanCFP_IntanEP"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-iomom-cust-iomom-supp",
-          "predictor": "zz1_iomom_cust__iomom_supp"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_iomom_cust__iomom_supp"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-optionvolume1-optionvolume2",
-          "predictor": "zz1_optionvolume1_optionvolume2"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_OptionVolume1_OptionVolume2"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-orgcap-orgcapnoadj",
-          "predictor": "zz1_orgcap_orgcapnoadj"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_OrgCap_OrgCapNoAdj"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-residualmomentum6m-residualmomentum",
-          "predictor": "zz1_residualmomentum6m_residualmomentum"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_ResidualMomentum6m_ResidualMomentum"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-rio-mb-rio-disp-rio-turnover-rio-volatility",
-          "predictor": "zz1_rio_mb_rio_disp_rio_turnover_rio_volatility"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_RIO_MB_RIO_Disp_RIO_Turnover_RIO_Volatility"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-zerotrade-zerotradealt1-zerotradealt12",
-          "predictor": "zz1_zerotrade_zerotradealt1_zerotradealt12"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ1_zerotrade_zerotradeAlt1_zerotradeAlt12"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz2-abnormalaccruals-abnormalaccrualspercent",
-          "predictor": "zz2_abnormalaccruals_abnormalaccrualspercent"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ2_AbnormalAccruals_AbnormalAccrualsPercent"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz2-announcementreturn",
-          "predictor": "zz2_announcementreturn"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ2_AnnouncementReturn"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz2-betafp",
-          "predictor": "zz2_betafp"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ2_BetaFP"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz2-betavix",
-          "predictor": "zz2_betavix"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ2_betaVIX"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz2-idiovolaht",
-          "predictor": "zz2_idiovolaht"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ2_IdioVolAHT"
         },
         {
-          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz2-pricedelayslope-pricedelayrsq-pricedelaytstat",
-          "predictor": "zz2_pricedelayslope_pricedelayrsq_pricedelaytstat"
+          "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
+          "predictor": "ZZ2_PriceDelaySlope_PriceDelayRsq_PriceDelayTstat"
         }
       ],
       "ResultPath": "$.predictors",
@@ -1085,13 +1082,13 @@
     "RunPredictors": {
       "ItemSelector": {
         "as_of_month.$": "$.monthly_context.as_of_month",
-        "function_name.$": "$$.Map.Item.Value.function_name",
         "preflight.$": "$.monthly_context.preflight",
         "predictor.$": "$$.Map.Item.Value.predictor",
         "quality_migration.$": "$.monthly_context.quality_migration",
         "run_id.$": "$.monthly_context.run_id",
         "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
-        "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256"
+        "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+        "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
       },
       "ItemProcessor": {
         "ProcessorConfig": {
@@ -1111,15 +1108,17 @@
             ],
             "End": true,
             "Parameters": {
-              "FunctionName.$": "$.function_name",
               "Payload": {
                 "as_of_month.$": "$.as_of_month",
                 "preflight.$": "$.preflight",
                 "quality_migration.$": "$.quality_migration",
                 "run_id.$": "$.run_id",
                 "signal_master_key.$": "$.signal_master_key",
-                "signal_master_sha256.$": "$.signal_master_sha256"
-              }
+                "signal_master_sha256.$": "$.signal_master_sha256",
+                "predictor.$": "$.predictor",
+                "source_snapshot_sha256.$": "$.source_snapshot_sha256"
+              },
+              "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker"
             },
             "Resource": "arn:aws:states:::lambda:invoke",
             "ResultPath": null,
@@ -1140,10 +1139,10 @@
             "Parameters": {
               "as_of_month.$": "$.as_of_month",
               "failure.$": "$.failure",
-              "function_name.$": "$.function_name",
               "predictor.$": "$.predictor",
               "run_id.$": "$.run_id",
-              "status": "failed"
+              "status": "failed",
+              "function_name": "euclidean-pred-worker"
             },
             "Type": "Pass"
           }
@@ -1151,7 +1150,7 @@
       },
       "ItemsPath": "$.predictors",
       "MaxConcurrency": 10,
-      "Next": "RunRIVolSpread",
+      "Next": "InitializeRIVolStatus",
       "ResultPath": "$.predictor_results",
       "Type": "Map"
     },
@@ -1162,7 +1161,8 @@
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
           "preflight.$": "$.monthly_context.preflight",
-          "run_id.$": "$.monthly_context.run_id"
+          "run_id.$": "$.monthly_context.run_id",
+          "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
         }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
@@ -1208,19 +1208,22 @@
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Next": "BuildPredictorAvailability",
-          "ResultPath": "$.rivol_spread_failure"
+          "Next": "MarkRIVolFailed",
+          "ResultPath": "$.rivol_status.failure"
         }
       ],
       "Next": "BuildPredictorAvailability",
       "Parameters": {
-        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-zz1-rivolspread",
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
           "preflight.$": "$.monthly_context.preflight",
           "run_id.$": "$.monthly_context.run_id",
           "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
-          "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256"
+          "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+          "predictor": "ZZ1_RIVolSpread",
+          "quality_migration.$": "$.monthly_context.quality_migration",
+          "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
         }
       },
       "Resource": "arn:aws:states:::lambda:invoke",
@@ -1236,6 +1239,38 @@
         }
       ],
       "Type": "Task"
+    },
+    "CheckPreflightComplete": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.monthly_context.preflight",
+          "BooleanEquals": true,
+          "Next": "PreflightComplete"
+        }
+      ],
+      "Default": "RunAlphaModel"
+    },
+    "PreflightComplete": {
+      "Type": "Succeed"
+    },
+    "InitializeRIVolStatus": {
+      "Type": "Pass",
+      "Result": {
+        "status": "ok",
+        "predictor": "ZZ1_RIVolSpread"
+      },
+      "ResultPath": "$.rivol_status",
+      "Next": "RunRIVolSpread"
+    },
+    "MarkRIVolFailed": {
+      "Type": "Pass",
+      "Result": {
+        "status": "failed",
+        "predictor": "ZZ1_RIVolSpread"
+      },
+      "ResultPath": "$.rivol_status",
+      "Next": "BuildPredictorAvailability"
     }
   }
 }
