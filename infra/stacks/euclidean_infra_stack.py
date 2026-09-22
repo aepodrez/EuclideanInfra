@@ -44,14 +44,17 @@ import os
 
 from aws_cdk import (
     CfnResource,
+    Duration,
     RemovalPolicy,
     Stack,
     Tags,
     aws_ec2 as ec2,
     aws_ecs as ecs,
     aws_events as events,
+    aws_events_targets as event_targets,
     aws_iam as iam,
     aws_kinesisfirehose as firehose,
+    aws_lambda as lambda_,
     aws_logs as logs,
     aws_s3 as s3,
     aws_sns as sns,
@@ -97,6 +100,7 @@ REFINITIV_FAMILY = "euclidean-data-ingress-refinitiv"  # task def registered by 
 MARKET_DATA_IMAGE = f"{ACCOUNT}.dkr.ecr.{REGION}.amazonaws.com/euclidean-market-data:latest"
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "assets")
+LAMBDA_ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "lambdas")
 
 
 def role_arn(name: str) -> str:
@@ -159,30 +163,107 @@ class EuclideanInfraStack(Stack):
         # =====================================================================
         # S3 data bucket (versioning / SSE / public-access-block fold into it)
         # =====================================================================
+        lifecycle_rules = [
+            s3.CfnBucket.RuleProperty(
+                id="retain-noncurrent-versions-for-30-days",
+                status="Enabled",
+                prefix="",
+                noncurrent_version_expiration=s3.CfnBucket.NoncurrentVersionExpirationProperty(
+                    noncurrent_days=30,
+                ),
+                abort_incomplete_multipart_upload=s3.CfnBucket.AbortIncompleteMultipartUploadProperty(
+                    days_after_initiation=7,
+                ),
+            ),
+            s3.CfnBucket.RuleProperty(
+                id="remove-expired-delete-markers",
+                status="Enabled",
+                prefix="",
+                expired_object_delete_marker=True,
+            ),
+        ]
+
+        # First-stage rollout: rules are represented in IaC but remain disabled
+        # until the audit-only retention reconciler has reported for 48 hours.
+        expiration_rules = {
+            "expire-xbrl-spill-cache-7d": ("data-ingress/cache/", 7),
+            "expire-common-crawl-athena-14d": ("alternative-data/common-crawl/athena/", 14),
+            "expire-company-web-athena-14d": ("alternative-data/company-web/archive/athena/", 14),
+            "expire-company-web-athena-shadow-14d": ("alternative-data/company-web/archive/athena-shadow/", 14),
+            "expire-alternative-shadows-30d": ("alternative-data/shadows/", 30),
+            "expire-company-web-discovery-work-30d": ("alternative-data/company-web/discovery/", 30),
+            "expire-company-web-snapshot-work-30d": ("alternative-data/company-web/snapshot/", 30),
+            "expire-gdelt-normalized-30d": ("alternative-data/gdelt/normalized/", 30),
+            "expire-gdelt-runs-30d": ("alternative-data/gdelt/runs/", 30),
+            "expire-ats-discovery-30d": ("alternative-data/ats/discovery/", 30),
+            "expire-ats-runs-30d": ("alternative-data/ats/runs/", 30),
+            "expire-youtube-normalized-30d": ("alternative-data/youtube/normalized/", 30),
+            "expire-youtube-receipts-30d": ("alternative-data/youtube/receipts/", 30),
+            "expire-youtube-dispatches-30d": ("alternative-data/youtube/dispatches/", 30),
+            "expire-wikimedia-normalized-30d": ("alternative-data/wikimedia/normalized/", 30),
+            "expire-wikimedia-receipts-30d": ("alternative-data/wikimedia/receipts/", 30),
+            "expire-wikimedia-dispatches-30d": ("alternative-data/wikimedia/dispatches/", 30),
+            "expire-universe-work-30d": ("universe/work/runs/", 30),
+            "expire-common-crawl-work-90d": ("alternative-data/common-crawl/runs/", 90),
+            "expire-company-web-archive-work-90d": ("alternative-data/company-web/archive/runs/", 90),
+            "expire-task-logs-90d": ("data-ingress/logs/", 90),
+        }
+        lifecycle_rules.extend(
+            s3.CfnBucket.RuleProperty(
+                id=rule_id, status="Disabled", prefix=prefix,
+                expiration_in_days=days,
+            )
+            for rule_id, (prefix, days) in expiration_rules.items()
+        )
+        lifecycle_rules.extend([
+            s3.CfnBucket.RuleProperty(
+                id="expire-quarantined-orphan-runs",
+                status="Disabled",
+                tag_filters=[s3.CfnBucket.TagFilterProperty(
+                    key="euclidean-retention", value="orphaned-run",
+                )],
+                expiration_in_days=30,
+            ),
+            s3.CfnBucket.RuleProperty(
+                id="archive-published-history-glacier-instant",
+                status="Disabled",
+                tag_filters=[s3.CfnBucket.TagFilterProperty(
+                    key="euclidean-retention", value="published-history",
+                )],
+                object_size_greater_than=131072,
+                transitions=[s3.CfnBucket.TransitionProperty(
+                    storage_class="GLACIER_IR", transition_in_days=30,
+                )],
+            ),
+        ])
+        raw_archive_rules = {
+            "archive-pit-raw-30d": ("data-ingress/pit/", 30),
+            "archive-company-web-direct-raw-90d": ("alternative-data/company-web/direct/raw/", 90),
+            "archive-company-web-common-crawl-raw-90d": ("alternative-data/company-web/archive/raw/", 90),
+            "archive-gdelt-raw-90d": ("alternative-data/gdelt/raw/", 90),
+            "archive-ats-raw-90d": ("alternative-data/ats/raw/", 90),
+            "archive-youtube-raw-90d": ("alternative-data/youtube/raw/", 90),
+            "archive-common-crawl-raw-90d": ("alternative-data/common-crawl/raw/", 90),
+        }
+        lifecycle_rules.extend(
+            s3.CfnBucket.RuleProperty(
+                id=rule_id,
+                status="Disabled",
+                prefix=prefix,
+                object_size_greater_than=131072,
+                transitions=[s3.CfnBucket.TransitionProperty(
+                    storage_class="GLACIER", transition_in_days=days,
+                )],
+            )
+            for rule_id, (prefix, days) in raw_archive_rules.items()
+        )
+
         bucket = s3.CfnBucket(
             self, "PipelineDataBucket",
             bucket_name=BUCKET_NAME,
             versioning_configuration=s3.CfnBucket.VersioningConfigurationProperty(status="Enabled"),
             lifecycle_configuration=s3.CfnBucket.LifecycleConfigurationProperty(
-                rules=[
-                    s3.CfnBucket.RuleProperty(
-                        id="retain-noncurrent-versions-for-30-days",
-                        status="Enabled",
-                        prefix="",
-                        noncurrent_version_expiration=s3.CfnBucket.NoncurrentVersionExpirationProperty(
-                            noncurrent_days=30,
-                        ),
-                        abort_incomplete_multipart_upload=s3.CfnBucket.AbortIncompleteMultipartUploadProperty(
-                            days_after_initiation=7,
-                        ),
-                    ),
-                    s3.CfnBucket.RuleProperty(
-                        id="remove-expired-delete-markers",
-                        status="Enabled",
-                        prefix="",
-                        expired_object_delete_marker=True,
-                    ),
-                ]
+                rules=lifecycle_rules,
             ),
             bucket_encryption=s3.CfnBucket.BucketEncryptionProperty(
                 server_side_encryption_configuration=[
@@ -201,6 +282,67 @@ class EuclideanInfraStack(Stack):
             ),
         )
         bucket.apply_removal_policy(RemovalPolicy.RETAIN)
+
+        retention_function_name = "euclidean-storage-retention-reconciler"
+        retention_log_group = logs.LogGroup(
+            self, "StorageRetentionReconcilerLogGroup",
+            log_group_name=f"/aws/lambda/{retention_function_name}",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+        retention_function = lambda_.Function(
+            self, "StorageRetentionReconciler",
+            function_name=retention_function_name,
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset(os.path.join(
+                LAMBDA_ASSETS_DIR, "storage_retention_reconciler"
+            )),
+            timeout=Duration.minutes(15),
+            memory_size=512,
+            reserved_concurrent_executions=1,
+            environment={
+                "S3_BUCKET": BUCKET_NAME,
+                "RETENTION_MODE": "audit",
+                "ORPHAN_QUARANTINE_DAYS": "30",
+                "RUN_ROOTS": (
+                    "pyData/Intermediate/_runs/,pyData/Predictors/_runs/,"
+                    "alternative-data/_runs/,universe/_runs/"
+                ),
+            },
+        )
+        retention_function.node.add_dependency(retention_log_group)
+        retention_function.add_to_role_policy(iam.PolicyStatement(
+            sid="ListApprovedDatasetRunRoots",
+            actions=["s3:ListBucket"],
+            resources=[BUCKET_ARN],
+            conditions={"StringLike": {"s3:prefix": [
+                "pyData/Intermediate/_runs/*",
+                "pyData/Predictors/_runs/*",
+                "alternative-data/_runs/*",
+                "universe/_runs/*",
+            ]}},
+        ))
+        run_resources = [
+            f"{BUCKET_ARN}/pyData/Intermediate/_runs/*",
+            f"{BUCKET_ARN}/pyData/Predictors/_runs/*",
+            f"{BUCKET_ARN}/alternative-data/_runs/*",
+            f"{BUCKET_ARN}/universe/_runs/*",
+        ]
+        retention_function.add_to_role_policy(iam.PolicyStatement(
+            sid="ReadAndTagApprovedDatasetRuns",
+            actions=[
+                "s3:GetObject", "s3:GetObjectTagging", "s3:PutObjectTagging",
+            ],
+            resources=run_resources,
+        ))
+        events.Rule(
+            self, "StorageRetentionReconcilerSchedule",
+            rule_name="euclidean-storage-retention-reconciler-daily",
+            description="Daily audit of immutable S3 dataset retention candidates",
+            schedule=events.Schedule.cron(minute="15", hour="7"),
+            targets=[event_targets.LambdaFunction(retention_function)],
+        )
 
         # =====================================================================
         # SNS notifications topic (subscriptions stay unmanaged — see docstring)
