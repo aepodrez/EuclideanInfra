@@ -183,8 +183,21 @@ class EuclideanInfraStack(Stack):
             ),
         ]
 
-        # First-stage rollout: rules are represented in IaC but remain disabled
-        # until the audit-only retention reconciler has reported for 48 hours.
+        retention_stage = str(
+            self.node.try_get_context("storageRetentionStage") or "production"
+        ).strip().lower()
+        if retention_stage not in {"tagging", "production"}:
+            raise ValueError(
+                "storageRetentionStage must be tagging or production"
+            )
+        lifecycle_status = (
+            "Enabled" if retention_stage == "production" else "Disabled"
+        )
+
+        # The tagging stage leaves destructive rules disabled while the
+        # reconciler applies the already-audited classifications. Production
+        # is the fail-safe default so later ordinary deployments cannot
+        # silently turn retention back off.
         expiration_rules = {
             "expire-xbrl-spill-cache-7d": ("data-ingress/cache/", 7),
             "expire-common-crawl-athena-14d": ("alternative-data/common-crawl/athena/", 14),
@@ -210,7 +223,7 @@ class EuclideanInfraStack(Stack):
         }
         lifecycle_rules.extend(
             s3.CfnBucket.RuleProperty(
-                id=rule_id, status="Disabled", prefix=prefix,
+                id=rule_id, status=lifecycle_status, prefix=prefix,
                 expiration_in_days=days,
             )
             for rule_id, (prefix, days) in expiration_rules.items()
@@ -218,7 +231,7 @@ class EuclideanInfraStack(Stack):
         lifecycle_rules.extend([
             s3.CfnBucket.RuleProperty(
                 id="expire-quarantined-orphan-runs",
-                status="Disabled",
+                status=lifecycle_status,
                 tag_filters=[s3.CfnBucket.TagFilterProperty(
                     key="euclidean-retention", value="orphaned-run",
                 )],
@@ -226,7 +239,7 @@ class EuclideanInfraStack(Stack):
             ),
             s3.CfnBucket.RuleProperty(
                 id="archive-published-history-glacier-instant",
-                status="Disabled",
+                status=lifecycle_status,
                 tag_filters=[s3.CfnBucket.TagFilterProperty(
                     key="euclidean-retention", value="published-history",
                 )],
@@ -248,7 +261,7 @@ class EuclideanInfraStack(Stack):
         lifecycle_rules.extend(
             s3.CfnBucket.RuleProperty(
                 id=rule_id,
-                status="Disabled",
+                status=lifecycle_status,
                 prefix=prefix,
                 object_size_greater_than=131072,
                 transitions=[s3.CfnBucket.TransitionProperty(
@@ -303,7 +316,8 @@ class EuclideanInfraStack(Stack):
             reserved_concurrent_executions=1,
             environment={
                 "S3_BUCKET": BUCKET_NAME,
-                "RETENTION_MODE": "audit",
+                "RETENTION_MODE": "apply",
+                "RETENTION_STAGE": retention_stage,
                 "ORPHAN_QUARANTINE_DAYS": "30",
                 "RUN_ROOTS": (
                     "pyData/Intermediate/_runs/,pyData/Predictors/_runs/,"
@@ -339,7 +353,7 @@ class EuclideanInfraStack(Stack):
         events.Rule(
             self, "StorageRetentionReconcilerSchedule",
             rule_name="euclidean-storage-retention-reconciler-daily",
-            description="Daily audit of immutable S3 dataset retention candidates",
+            description="Daily classification of immutable S3 dataset retention candidates",
             schedule=events.Schedule.cron(minute="15", hour="7"),
             targets=[event_targets.LambdaFunction(retention_function)],
         )
