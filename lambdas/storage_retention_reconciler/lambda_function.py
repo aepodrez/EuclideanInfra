@@ -225,10 +225,29 @@ def reconcile_dataset(
     if final_etag != current_etag:
         counts["errors"] += 1
         return counts
-    for objects, value in candidates:
-        for item in objects:
-            if _merge_tag(s3, bucket, item["Key"], value):
-                counts["tagged_objects"] += 1
+    tag_jobs = [
+        (item["Key"], value)
+        for objects, value in candidates
+        for item in objects
+    ]
+
+    # Tagging requires a read/merge/write cycle per object. Run those independent
+    # I/O operations concurrently so a large historical backlog cannot exhaust
+    # Lambda's 15-minute ceiling. The client connection pool is sized for this
+    # bound, and failures are counted so lifecycle activation can fail closed.
+    def tag_object(job: tuple[str, str]) -> tuple[int, int]:
+        key, value = job
+        try:
+            return (1 if _merge_tag(s3, bucket, key, value) else 0, 0)
+        except ClientError:
+            log.exception("failed to tag retention candidate: %s", key)
+            return 0, 1
+
+    workers = min(32, max(1, len(tag_jobs)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for tagged, errors in pool.map(tag_object, tag_jobs):
+            counts["tagged_objects"] += tagged
+            counts["errors"] += errors
     return counts
 
 
