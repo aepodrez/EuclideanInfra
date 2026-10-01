@@ -17,6 +17,7 @@
           "preflight.$": "$.monthly_context.preflight",
           "predictor_results.$": "$.predictor_results",
           "run_id.$": "$.monthly_context.run_id",
+          "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
           "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
           "rivol_status.$": "$.rivol_status"
         }
@@ -117,6 +118,7 @@
         },
         "run_id.$": "$.Payload.run_id",
         "source_manifest_count.$": "$.Payload.source_manifest_count",
+        "source_snapshot_key.$": "$.Payload.source_snapshot_key",
         "source_snapshot_sha256.$": "$.Payload.source_snapshot_sha256",
         "statusCode.$": "$.Payload.statusCode",
         "predictor_policy_version.$": "$.Payload.predictor_policy_version"
@@ -1162,6 +1164,7 @@
           "as_of_month.$": "$.monthly_context.as_of_month",
           "preflight.$": "$.monthly_context.preflight",
           "run_id.$": "$.monthly_context.run_id",
+          "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
           "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
         }
       },

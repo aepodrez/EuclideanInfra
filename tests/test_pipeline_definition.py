@@ -71,6 +71,7 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
         "predictor_results.$": "$.predictor_results",
         "rivol_status.$": "$.rivol_status",
         "run_id.$": "$.monthly_context.run_id",
+        "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
         "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
     }
     assert availability["Next"] == "CheckPredictorAvailability"
@@ -146,6 +147,9 @@ def test_alpha_gate_requires_exact_month_and_catalog_hash():
 
 def test_signal_master_is_gated_before_predictors():
     states = _definition()["States"]
+    assert states["ResolveMonthlyContext"]["ResultSelector"][
+        "source_snapshot_key.$"
+    ] == "$.Payload.source_snapshot_key"
     assert states["RunSignalMaster"]["Next"] == "CheckSignalMaster"
     assert states["RunSignalMaster"]["Parameters"]["Payload"]["preflight.$"] == (
         "$.monthly_context.preflight"
@@ -153,6 +157,10 @@ def test_signal_master_is_gated_before_predictors():
     assert states["RunSignalMaster"]["Parameters"]["Payload"][
         "source_snapshot_sha256.$"
     ] == "$.monthly_context.source_snapshot_sha256"
+    for state in ("RunSignalMaster", "BuildPredictorAvailability"):
+        assert states[state]["Parameters"]["Payload"]["source_snapshot_key.$"] == (
+            "$.monthly_context.source_snapshot_key"
+        )
     assert states["CheckSignalMaster"]["Choices"][0]["Next"] == "PreparePredictors"
     assert states["CheckSignalMaster"]["Default"] == "SignalMasterFailed"
 
