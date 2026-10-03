@@ -65,6 +65,32 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
     }
 
 
+def test_high_memory_predictors_use_bounded_on_demand_task():
+    processor = _definition()["States"]["RunPredictors"]["ItemProcessor"]
+    states = processor["States"]
+    assert processor["StartAt"] == "ChoosePredictorRuntime"
+    choice = states["ChoosePredictorRuntime"]
+    assert choice["Default"] == "InvokePredictor"
+    assert {part["StringEquals"] for part in choice["Choices"][0]["Or"]} == {
+        "CBOperProf", "EntMult", "EquityDuration", "ExchSwitch",
+        "ChAssetTurnover", "Coskewness", "CustomerMomentum", "DelCOL",
+    }
+    task = states["RunHighMemoryPredictor"]
+    assert task["Resource"] == "arn:aws:states:::ecs:runTask.sync"
+    assert task["Parameters"]["TaskDefinition"] == "euclidean-monthly-predictor-high-memory"
+    assert task["Parameters"]["Overrides"]["ContainerOverrides"][0]["Environment"] == [
+        {"Name": "PREDICTOR_EVENT_JSON", "Value.$": "States.JsonToString($)"}
+    ]
+    assert task["TimeoutSeconds"] == 600
+    assert task["Catch"][0]["Next"] == "RecordPredictorFailure"
+    assert states["CheckHighMemoryPredictorExit"]["Default"] == "RecordHighMemoryPredictorFailure"
+    assert states["InvokePredictor"]["Retry"][0]["ErrorEquals"] == [
+        "Lambda.ServiceException", "Lambda.AWSLambdaException",
+        "Lambda.SdkClientException", "Lambda.TooManyRequestsException",
+    ]
+    assert "task-definition/euclidean-monthly-predictor-high-memory:*" in INFRA_STACK.read_text()
+
+
 def test_availability_reconciliation_gates_alpha_on_potent_catalog():
     states = _definition()["States"]
     availability = states["BuildPredictorAvailability"]

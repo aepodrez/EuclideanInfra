@@ -404,6 +404,7 @@ class EuclideanInfraStack(Stack):
                             f"arn:aws:ecs:{REGION}:{ACCOUNT}:task-definition/euclidean-data-ingress-downloads:*",
                             f"arn:aws:ecs:{REGION}:{ACCOUNT}:task-definition/euclidean-data-ingress-refinitiv:*",
                             f"arn:aws:ecs:{REGION}:{ACCOUNT}:task-definition/euclidean-data-ingress-predictors:*",
+                            f"arn:aws:ecs:{REGION}:{ACCOUNT}:task-definition/euclidean-monthly-predictor-high-memory:*",
                             f"arn:aws:ecs:{REGION}:{ACCOUNT}:task-definition/euclidean-portfolio-construction:*",
                         ],
                     ),

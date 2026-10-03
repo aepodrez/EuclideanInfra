@@ -1097,8 +1097,79 @@
         "ProcessorConfig": {
           "Mode": "INLINE"
         },
-        "StartAt": "InvokePredictor",
+        "StartAt": "ChoosePredictorRuntime",
         "States": {
+          "ChoosePredictorRuntime": {
+            "Type": "Choice",
+            "Choices": [
+              {
+                "Or": [
+                  {"Variable": "$.predictor", "StringEquals": "CBOperProf"},
+                  {"Variable": "$.predictor", "StringEquals": "EntMult"},
+                  {"Variable": "$.predictor", "StringEquals": "EquityDuration"},
+                  {"Variable": "$.predictor", "StringEquals": "ExchSwitch"},
+                  {"Variable": "$.predictor", "StringEquals": "ChAssetTurnover"},
+                  {"Variable": "$.predictor", "StringEquals": "Coskewness"},
+                  {"Variable": "$.predictor", "StringEquals": "CustomerMomentum"},
+                  {"Variable": "$.predictor", "StringEquals": "DelCOL"}
+                ],
+                "Next": "RunHighMemoryPredictor"
+              }
+            ],
+            "Default": "InvokePredictor"
+          },
+          "RunHighMemoryPredictor": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::ecs:runTask.sync",
+            "Parameters": {
+              "Cluster": "arn:aws:ecs:us-east-1:954976294836:cluster/euclidean-cluster",
+              "TaskDefinition": "euclidean-monthly-predictor-high-memory",
+              "LaunchType": "FARGATE",
+              "NetworkConfiguration": {
+                "AwsvpcConfiguration": {
+                  "AssignPublicIp": "ENABLED",
+                  "SecurityGroups": ["sg-010ca983e1744a0f9"],
+                  "Subnets": ["subnet-0cb23cb16a893e69b", "subnet-0c7d5564c847ec3b9"]
+                }
+              },
+              "Overrides": {
+                "ContainerOverrides": [
+                  {
+                    "Name": "monthly-predictor-high-memory",
+                    "Environment": [
+                      {"Name": "PREDICTOR_EVENT_JSON", "Value.$": "States.JsonToString($)"}
+                    ]
+                  }
+                ]
+              }
+            },
+            "ResultPath": "$.ecs_result",
+            "TimeoutSeconds": 600,
+            "Next": "CheckHighMemoryPredictorExit",
+            "Catch": [
+              {"ErrorEquals": ["States.ALL"], "ResultPath": "$.failure", "Next": "RecordPredictorFailure"}
+            ]
+          },
+          "CheckHighMemoryPredictorExit": {
+            "Type": "Choice",
+            "Choices": [
+              {"Variable": "$.ecs_result.Tasks[0].Containers[0].ExitCode", "NumericEquals": 0, "Next": "HighMemoryPredictorComplete"}
+            ],
+            "Default": "RecordHighMemoryPredictorFailure"
+          },
+          "HighMemoryPredictorComplete": {"Type": "Succeed"},
+          "RecordHighMemoryPredictorFailure": {
+            "Type": "Pass",
+            "Parameters": {
+              "as_of_month.$": "$.as_of_month",
+              "predictor.$": "$.predictor",
+              "run_id.$": "$.run_id",
+              "status": "failed",
+              "function_name": "euclidean-monthly-predictor-high-memory",
+              "failure.$": "$.ecs_result"
+            },
+            "End": true
+          },
           "InvokePredictor": {
             "Catch": [
               {
@@ -1130,7 +1201,10 @@
               {
                 "BackoffRate": 2,
                 "ErrorEquals": [
-                  "States.ALL"
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
                 ],
                 "IntervalSeconds": 10,
                 "MaxAttempts": 2
