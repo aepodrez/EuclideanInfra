@@ -1090,6 +1090,7 @@
         "run_id.$": "$.monthly_context.run_id",
         "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
         "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+        "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
         "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
       },
       "ItemProcessor": {
@@ -1118,6 +1119,7 @@
                 "signal_master_key.$": "$.signal_master_key",
                 "signal_master_sha256.$": "$.signal_master_sha256",
                 "predictor.$": "$.predictor",
+                "source_snapshot_key.$": "$.source_snapshot_key",
                 "source_snapshot_sha256.$": "$.source_snapshot_sha256"
               },
               "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker"
@@ -1226,6 +1228,7 @@
           "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
           "predictor": "ZZ1_RIVolSpread",
           "quality_migration.$": "$.monthly_context.quality_migration",
+          "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
           "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256"
         }
       },

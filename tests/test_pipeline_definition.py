@@ -35,6 +35,7 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
         "run_id.$": "$.monthly_context.run_id",
         "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
         "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+        "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
         "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
     }
     assert invoke["Parameters"]["Payload"] == {
@@ -45,6 +46,7 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
         "run_id.$": "$.run_id",
         "signal_master_key.$": "$.signal_master_key",
         "signal_master_sha256.$": "$.signal_master_sha256",
+        "source_snapshot_key.$": "$.source_snapshot_key",
         "source_snapshot_sha256.$": "$.source_snapshot_sha256",
     }
     assert invoke["Catch"] == [{
@@ -54,6 +56,9 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
     }]
     assert processor["RecordPredictorFailure"]["Type"] == "Pass"
     assert definition["States"]["RunPredictors"]["Next"] == "InitializeRIVolStatus"
+    assert definition["States"]["RunRIVolSpread"]["Parameters"]["Payload"][
+        "source_snapshot_key.$"
+    ] == "$.monthly_context.source_snapshot_key"
     assert definition["States"]["MarkRIVolFailed"]["Result"] == {
         "status": "failed",
         "predictor": "ZZ1_RIVolSpread",
