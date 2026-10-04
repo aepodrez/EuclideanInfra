@@ -56,6 +56,9 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
     }]
     assert processor["RecordPredictorFailure"]["Type"] == "Pass"
     assert definition["States"]["RunPredictors"]["Next"] == "InitializeRIVolStatus"
+    assert definition["States"]["RunPredictors"]["ItemsPath"] == (
+        "$.predictor_dispatch.Payload.items"
+    )
     assert definition["States"]["RunRIVolSpread"]["Parameters"]["Payload"][
         "source_snapshot_key.$"
     ] == "$.monthly_context.source_snapshot_key"
@@ -91,12 +94,35 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     assert "task-definition/euclidean-monthly-predictor-high-memory:*" in INFRA_STACK.read_text()
 
 
+def test_monthly_start_waits_for_exact_source_readiness_and_seals_dispatch():
+    states = _definition()["States"]
+    context = states["ResolveMonthlyContext"]
+    assert context["Next"] == "CheckMonthlySourceReadiness"
+    choice = states["CheckMonthlySourceReadiness"]["Choices"]
+    assert choice == [
+        {"Variable": "$.monthly_context.statusCode", "NumericEquals": 200,
+         "Next": "RunSignalMaster"},
+        {"Variable": "$.monthly_context.statusCode", "NumericEquals": 202,
+         "Next": "WaitForMonthlySources"},
+    ]
+    assert states["WaitForMonthlySources"] == {
+        "Type": "Wait", "Seconds": 900, "Next": "ResolveMonthlyContext",
+    }
+    assert states["PreparePredictors"]["Next"] == "FilterCompletedPredictors"
+    dispatch = states["FilterCompletedPredictors"]
+    assert dispatch["Parameters"]["Payload"]["expected.$"] == "$.predictors"
+    assert dispatch["Parameters"]["Payload"]["mode"] == "dispatch"
+    assert dispatch["Next"] == "RunPredictors"
+
+
 def test_availability_reconciliation_gates_alpha_on_potent_catalog():
     states = _definition()["States"]
     availability = states["BuildPredictorAvailability"]
 
     assert availability["Parameters"]["Payload"] == {
         "as_of_month.$": "$.monthly_context.as_of_month",
+        "dispatch_index_key.$": "$.predictor_dispatch.Payload.dispatch_index_key",
+        "dispatch_index_sha256.$": "$.predictor_dispatch.Payload.dispatch_index_sha256",
         "mode": "reconcile",
         "preflight.$": "$.monthly_context.preflight",
         "predictor_results.$": "$.predictor_results",
@@ -104,6 +130,8 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
         "run_id.$": "$.monthly_context.run_id",
         "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
         "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
+        "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+        "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
     }
     assert availability["Next"] == "CheckPredictorAvailability"
     gate = states["CheckPredictorAvailability"]

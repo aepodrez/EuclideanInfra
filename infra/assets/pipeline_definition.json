@@ -13,12 +13,16 @@
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-predictor-availability",
         "Payload": {
           "as_of_month.$": "$.monthly_context.as_of_month",
+          "dispatch_index_key.$": "$.predictor_dispatch.Payload.dispatch_index_key",
+          "dispatch_index_sha256.$": "$.predictor_dispatch.Payload.dispatch_index_sha256",
           "mode": "reconcile",
           "preflight.$": "$.monthly_context.preflight",
           "predictor_results.$": "$.predictor_results",
           "run_id.$": "$.monthly_context.run_id",
           "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
           "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
+          "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+          "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
           "rivol_status.$": "$.rivol_status"
         }
       },
@@ -90,7 +94,7 @@
       "Type": "Fail"
     },
     "ResolveMonthlyContext": {
-      "Next": "RunSignalMaster",
+      "Next": "CheckMonthlySourceReadiness",
       "Parameters": {
         "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-predictor-availability",
         "Payload": {
@@ -103,6 +107,8 @@
       "ResultPath": "$.monthly_context",
       "ResultSelector": {
         "as_of_month.$": "$.Payload.as_of_month",
+        "deadline.$": "$.Payload.deadline",
+        "pending_sources.$": "$.Payload.pending_sources",
         "preflight.$": "$.Payload.preflight",
         "production_enabled.$": "$.Payload.production_enabled",
         "quality_migration.$": "$.Payload.quality_migration",
@@ -134,6 +140,24 @@
         }
       ],
       "Type": "Task"
+    },
+    "CheckMonthlySourceReadiness": {
+      "Type": "Choice",
+      "Choices": [
+        {"Variable": "$.monthly_context.statusCode", "NumericEquals": 200, "Next": "RunSignalMaster"},
+        {"Variable": "$.monthly_context.statusCode", "NumericEquals": 202, "Next": "WaitForMonthlySources"}
+      ],
+      "Default": "MonthlySourceReadinessFailed"
+    },
+    "WaitForMonthlySources": {
+      "Type": "Wait",
+      "Seconds": 900,
+      "Next": "ResolveMonthlyContext"
+    },
+    "MonthlySourceReadinessFailed": {
+      "Type": "Fail",
+      "Error": "MonthlySourceReadinessFailed",
+      "Cause": "Required immutable month-end inputs did not pass readiness."
     },
     "CheckAlphaModelResult": {
       "Choices": [
@@ -187,7 +211,7 @@
       "Type": "Fail"
     },
     "PreparePredictors": {
-      "Next": "RunPredictors",
+      "Next": "FilterCompletedPredictors",
       "Result": [
         {
           "function_name": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-pred-worker",
@@ -933,6 +957,25 @@
       "ResultPath": "$.predictors",
       "Type": "Pass"
     },
+    "FilterCompletedPredictors": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-predictor-availability",
+        "Payload": {
+          "mode": "dispatch",
+          "as_of_month.$": "$.monthly_context.as_of_month",
+          "run_id.$": "$.monthly_context.run_id",
+          "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
+          "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
+          "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
+          "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+          "expected.$": "$.predictors"
+        }
+      },
+      "ResultPath": "$.predictor_dispatch",
+      "Next": "RunPredictors"
+    },
     "RunAlphaModel": {
       "Next": "CheckAlphaModelResult",
       "Parameters": {
@@ -1226,7 +1269,7 @@
           }
         }
       },
-      "ItemsPath": "$.predictors",
+      "ItemsPath": "$.predictor_dispatch.Payload.items",
       "MaxConcurrency": 10,
       "Next": "InitializeRIVolStatus",
       "ResultPath": "$.predictor_results",
