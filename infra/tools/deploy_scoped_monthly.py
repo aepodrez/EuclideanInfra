@@ -34,12 +34,26 @@ def _template(value: object) -> dict:
     return json.loads(value) if isinstance(value, str) else value
 
 
+def _canonical_policies(policies: list[dict]) -> list[dict]:
+    """Compare IAM permissions, not CloudFormation's ordering of their lists."""
+    normalized = copy.deepcopy(policies)
+    for policy in normalized:
+        statements = policy["PolicyDocument"]["Statement"]
+        for statement in statements:
+            for field in ("Action", "Resource"):
+                if isinstance(statement.get(field), list):
+                    statement[field].sort()
+        statements.sort(key=lambda item: json.dumps(item, sort_keys=True))
+    return sorted(normalized, key=lambda item: item.get("PolicyName", ""))
+
+
 def scoped_template(current: dict, synthesized: dict) -> dict:
     result = copy.deepcopy(current)
     old_policies = current["Resources"]["StepFunctionRoleC4BAB6F8"]["Properties"]["Policies"]
-    new_policies = copy.deepcopy(
+    synthesized_policies = copy.deepcopy(
         synthesized["Resources"]["StepFunctionRoleC4BAB6F8"]["Properties"]["Policies"]
     )
+    new_policies = copy.deepcopy(synthesized_policies)
     replacements = 0
     for policy in new_policies:
         for statement in policy["PolicyDocument"]["Statement"]:
@@ -49,10 +63,12 @@ def scoped_template(current: dict, synthesized: dict) -> dict:
                     raise RuntimeError("High-memory task ARN appears outside RunTask permission")
                 resources.remove(HIGH_MEMORY_TASK_ARN)
                 replacements += 1
-    if replacements != 1 or (
-        new_policies != old_policies
-        and synthesized["Resources"]["StepFunctionRoleC4BAB6F8"]["Properties"]["Policies"] != old_policies
-    ):
+    already_authorized = _canonical_policies(synthesized_policies) == _canonical_policies(old_policies)
+    only_expected_addition = (
+        replacements == 1
+        and _canonical_policies(new_policies) == _canonical_policies(old_policies)
+    )
+    if not (already_authorized or only_expected_addition):
         raise RuntimeError("Monthly release changes IAM beyond the exact high-memory task ARN")
     for resource, property_name in RESOURCE_PROPERTIES.items():
         old = current["Resources"][resource]
@@ -60,7 +76,8 @@ def scoped_template(current: dict, synthesized: dict) -> dict:
         if old["Type"] != new["Type"]:
             raise RuntimeError(f"{resource} changes resource type")
         result["Resources"][resource]["Properties"][property_name] = copy.deepcopy(
-            new["Properties"][property_name]
+            old_policies if resource == "StepFunctionRoleC4BAB6F8" and already_authorized
+            else new["Properties"][property_name]
         )
     changed = {
         resource for resource in current["Resources"]
