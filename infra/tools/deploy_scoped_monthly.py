@@ -19,10 +19,14 @@ from botocore.exceptions import ClientError
 
 
 STACK = "euclidean-infra"
-BUCKET = "euclidean-pipeline-954976294836"
+DEPLOY_BUCKET = "cdk-hnb659fds-assets-954976294836-us-east-1"
 DEPLOY_ROLE = (
     "arn:aws:iam::954976294836:role/"
     "cdk-hnb659fds-deploy-role-954976294836-us-east-1"
+)
+FILE_PUBLISHING_ROLE = (
+    "arn:aws:iam::954976294836:role/"
+    "cdk-hnb659fds-file-publishing-role-954976294836-us-east-1"
 )
 RESOURCE_PROPERTIES = {
     "Pipeline": "DefinitionString",
@@ -38,9 +42,9 @@ def _template(value: object) -> dict:
     return json.loads(value) if isinstance(value, str) else value
 
 
-def _deployment_session() -> boto3.Session:
+def _assumed_session(role_arn: str, session_name: str) -> boto3.Session:
     credentials = boto3.client("sts", region_name="us-east-1").assume_role(
-        RoleArn=DEPLOY_ROLE, RoleSessionName="ScopedMonthlyRelease",
+        RoleArn=role_arn, RoleSessionName=session_name,
     )["Credentials"]
     return boto3.Session(
         aws_access_key_id=credentials["AccessKeyId"],
@@ -124,7 +128,7 @@ def main() -> None:
         if remote_sha != args.sha:
             raise RuntimeError("Scoped release requires the exact current origin/main SHA")
 
-    deployment = _deployment_session()
+    deployment = _assumed_session(DEPLOY_ROLE, "ScopedMonthlyRelease")
     cfn = deployment.client("cloudformation")
     current = _template(cfn.get_template(StackName=STACK, TemplateStage="Processed")["TemplateBody"])
     synthesized = json.loads(args.synthesized_template.read_text(encoding="utf-8"))
@@ -135,22 +139,22 @@ def main() -> None:
     if not args.execute:
         return
 
-    key = f"data-ingress/deployments/monthly-readiness/{args.sha}/{digest}.json"
-    s3 = deployment.client("s3")
+    key = f"scoped/monthly-readiness/{args.sha}/{digest}.json"
+    s3 = _assumed_session(FILE_PUBLISHING_ROLE, "ScopedMonthlyTemplate").client("s3")
     try:
         s3.put_object(
-            Bucket=BUCKET, Key=key, Body=body, ContentType="application/json",
+            Bucket=DEPLOY_BUCKET, Key=key, Body=body, ContentType="application/json",
             ServerSideEncryption="AES256", IfNoneMatch="*",
         )
     except ClientError as error:
         if error.response["Error"]["Code"] not in {"PreconditionFailed", "412"}:
             raise
-        existing = s3.get_object(Bucket=BUCKET, Key=key)["Body"].read()
+        existing = s3.get_object(Bucket=DEPLOY_BUCKET, Key=key)["Body"].read()
         if hashlib.sha256(existing).hexdigest() != digest:
             raise RuntimeError("Immutable deployment template collision") from error
 
     name = f"november-readiness-{args.sha[:12]}-{int(time.time())}"
-    url = f"https://{BUCKET}.s3.us-east-1.amazonaws.com/{key}"
+    url = f"https://{DEPLOY_BUCKET}.s3.us-east-1.amazonaws.com/{key}"
     response = cfn.create_change_set(
         StackName=STACK, ChangeSetName=name, ChangeSetType="UPDATE",
         TemplateURL=url, Capabilities=["CAPABILITY_NAMED_IAM"],
