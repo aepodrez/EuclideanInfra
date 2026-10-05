@@ -77,6 +77,7 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     assert {part["StringEquals"] for part in choice["Choices"][0]["Or"]} == {
         "CBOperProf", "EntMult", "EquityDuration", "ExchSwitch",
         "ChAssetTurnover", "Coskewness", "CustomerMomentum", "DelCOL",
+        "DelDRC", "DivYieldST", "Frontier", "IndMom",
     }
     task = states["RunHighMemoryPredictor"]
     assert task["Resource"] == "arn:aws:states:::ecs:runTask.sync"
@@ -84,7 +85,7 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     assert task["Parameters"]["Overrides"]["ContainerOverrides"][0]["Environment"] == [
         {"Name": "PREDICTOR_EVENT_JSON", "Value.$": "States.JsonToString($)"}
     ]
-    assert task["TimeoutSeconds"] == 600
+    assert task["TimeoutSeconds"] == 900
     assert task["Catch"][0]["Next"] == "RecordPredictorFailure"
     assert states["CheckHighMemoryPredictorExit"]["Default"] == "RecordHighMemoryPredictorFailure"
     assert states["InvokePredictor"]["Retry"][0]["ErrorEquals"] == [

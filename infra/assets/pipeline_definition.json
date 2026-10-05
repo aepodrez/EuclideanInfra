@@ -1154,7 +1154,11 @@
                   {"Variable": "$.predictor", "StringEquals": "ChAssetTurnover"},
                   {"Variable": "$.predictor", "StringEquals": "Coskewness"},
                   {"Variable": "$.predictor", "StringEquals": "CustomerMomentum"},
-                  {"Variable": "$.predictor", "StringEquals": "DelCOL"}
+                  {"Variable": "$.predictor", "StringEquals": "DelCOL"},
+                  {"Variable": "$.predictor", "StringEquals": "DelDRC"},
+                  {"Variable": "$.predictor", "StringEquals": "DivYieldST"},
+                  {"Variable": "$.predictor", "StringEquals": "Frontier"},
+                  {"Variable": "$.predictor", "StringEquals": "IndMom"}
                 ],
                 "Next": "RunHighMemoryPredictor"
               }
@@ -1187,7 +1191,7 @@
               }
             },
             "ResultPath": "$.ecs_result",
-            "TimeoutSeconds": 600,
+            "TimeoutSeconds": 900,
             "Next": "CheckHighMemoryPredictorExit",
             "Catch": [
               {"ErrorEquals": ["States.ALL"], "ResultPath": "$.failure", "Next": "RecordPredictorFailure"}

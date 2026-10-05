@@ -52,3 +52,13 @@ def test_scoped_template_rejects_extra_iam_permission():
     ]["Statement"][0]["Resource"].append("unexpected-task")
     with pytest.raises(RuntimeError, match="changes IAM beyond"):
         scoped_template(current, candidate)
+
+
+def test_scoped_template_accepts_pipeline_only_revision_after_iam_cutover():
+    current, candidate = _templates()
+    current["Resources"]["StepFunctionRoleC4BAB6F8"]["Properties"]["Policies"] = copy.deepcopy(
+        candidate["Resources"]["StepFunctionRoleC4BAB6F8"]["Properties"]["Policies"]
+    )
+    result = scoped_template(current, candidate)
+    assert result["Resources"]["Pipeline"]["Properties"]["DefinitionString"] == "new"
+    assert result["Resources"]["StepFunctionRoleC4BAB6F8"] == current["Resources"]["StepFunctionRoleC4BAB6F8"]

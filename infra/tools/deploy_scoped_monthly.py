@@ -49,7 +49,10 @@ def scoped_template(current: dict, synthesized: dict) -> dict:
                     raise RuntimeError("High-memory task ARN appears outside RunTask permission")
                 resources.remove(HIGH_MEMORY_TASK_ARN)
                 replacements += 1
-    if replacements != 1 or new_policies != old_policies:
+    if replacements != 1 or (
+        new_policies != old_policies
+        and synthesized["Resources"]["StepFunctionRoleC4BAB6F8"]["Properties"]["Policies"] != old_policies
+    ):
         raise RuntimeError("Monthly release changes IAM beyond the exact high-memory task ARN")
     for resource, property_name in RESOURCE_PROPERTIES.items():
         old = current["Resources"][resource]
@@ -63,7 +66,7 @@ def scoped_template(current: dict, synthesized: dict) -> dict:
         resource for resource in current["Resources"]
         if current["Resources"][resource] != result["Resources"][resource]
     }
-    if changed != set(RESOURCE_PROPERTIES):
+    if not changed.issubset(RESOURCE_PROPERTIES):
         raise RuntimeError(f"Unexpected scoped resource changes: {sorted(changed)}")
     return result
 
@@ -134,7 +137,11 @@ def main() -> None:
 
     changes = detail.get("Changes", [])
     actual = {item["ResourceChange"]["LogicalResourceId"] for item in changes}
-    if actual != set(RESOURCE_PROPERTIES):
+    expected = {
+        resource for resource in RESOURCE_PROPERTIES
+        if current["Resources"][resource] != desired["Resources"][resource]
+    }
+    if actual != expected:
         raise RuntimeError(f"Refusing non-scoped CloudFormation changes: {sorted(actual)}")
     for item in changes:
         change = item["ResourceChange"]
