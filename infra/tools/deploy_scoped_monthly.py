@@ -20,6 +20,10 @@ from botocore.exceptions import ClientError
 
 STACK = "euclidean-infra"
 BUCKET = "euclidean-pipeline-954976294836"
+DEPLOY_ROLE = (
+    "arn:aws:iam::954976294836:role/"
+    "cdk-hnb659fds-deploy-role-954976294836-us-east-1"
+)
 RESOURCE_PROPERTIES = {
     "Pipeline": "DefinitionString",
     "StepFunctionRoleC4BAB6F8": "Policies",
@@ -32,6 +36,18 @@ HIGH_MEMORY_TASK_ARN = (
 
 def _template(value: object) -> dict:
     return json.loads(value) if isinstance(value, str) else value
+
+
+def _deployment_session() -> boto3.Session:
+    credentials = boto3.client("sts", region_name="us-east-1").assume_role(
+        RoleArn=DEPLOY_ROLE, RoleSessionName="ScopedMonthlyRelease",
+    )["Credentials"]
+    return boto3.Session(
+        aws_access_key_id=credentials["AccessKeyId"],
+        aws_secret_access_key=credentials["SecretAccessKey"],
+        aws_session_token=credentials["SessionToken"],
+        region_name="us-east-1",
+    )
 
 
 def _canonical_policies(policies: list[dict]) -> list[dict]:
@@ -108,7 +124,8 @@ def main() -> None:
         if remote_sha != args.sha:
             raise RuntimeError("Scoped release requires the exact current origin/main SHA")
 
-    cfn = boto3.client("cloudformation", region_name="us-east-1")
+    deployment = _deployment_session()
+    cfn = deployment.client("cloudformation")
     current = _template(cfn.get_template(StackName=STACK, TemplateStage="Processed")["TemplateBody"])
     synthesized = json.loads(args.synthesized_template.read_text(encoding="utf-8"))
     desired = scoped_template(current, synthesized)
@@ -119,7 +136,7 @@ def main() -> None:
         return
 
     key = f"data-ingress/deployments/monthly-readiness/{args.sha}/{digest}.json"
-    s3 = boto3.client("s3", region_name="us-east-1")
+    s3 = deployment.client("s3")
     try:
         s3.put_object(
             Bucket=BUCKET, Key=key, Body=body, ContentType="application/json",

@@ -40,6 +40,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Require explicit deployment scope
+        run: |
+          message="$(git log -1 --format=%s)"
+          if [[ "$message" == *'[full-infra-deploy]'* && "$message" == *'[scoped-monthly-readiness]'* ]]; then
+            echo 'Conflicting deployment scopes' >&2
+            exit 1
+          fi
+          if [[ "$message" != *'[full-infra-deploy]'* && "$message" != *'[scoped-monthly-readiness]'* ]]; then
+            echo 'Infra deployment requires an explicit scoped or full release marker' >&2
+            exit 1
+          fi
+
       - name: Configure AWS credentials (OIDC)
         if: ${{ env.AWS_ACCESS_KEY_ID_INPUT == '' && env.AWS_ROLE_TO_ASSUME != '' }}
         uses: aws-actions/configure-aws-credentials@v4
@@ -67,7 +79,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: cdk deploy
-        if: ${{ !contains(github.event.head_commit.message, '[scoped-monthly-readiness]') }}
+        if: ${{ contains(github.event.head_commit.message, '[full-infra-deploy]') }}
         working-directory: infra
         env:
           CDK_DEFAULT_ACCOUNT: "954976294836"

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "infra" / "tools"))
+import deploy_scoped_monthly
 from deploy_scoped_monthly import HIGH_MEMORY_TASK_ARN, scoped_template
 
 
@@ -62,3 +63,23 @@ def test_scoped_template_accepts_pipeline_only_revision_after_iam_cutover():
     result = scoped_template(current, candidate)
     assert result["Resources"]["Pipeline"]["Properties"]["DefinitionString"] == "new"
     assert result["Resources"]["StepFunctionRoleC4BAB6F8"] == current["Resources"]["StepFunctionRoleC4BAB6F8"]
+
+
+def test_scoped_release_uses_existing_cdk_deploy_role(monkeypatch):
+    calls = []
+
+    class FakeSts:
+        def assume_role(self, **kwargs):
+            calls.append(kwargs)
+            return {"Credentials": {
+                "AccessKeyId": "a", "SecretAccessKey": "b", "SessionToken": "c",
+            }}
+
+    monkeypatch.setattr(deploy_scoped_monthly.boto3, "client", lambda *args, **kwargs: FakeSts())
+    monkeypatch.setattr(deploy_scoped_monthly.boto3, "Session", lambda **kwargs: kwargs)
+    session = deploy_scoped_monthly._deployment_session()
+    assert calls == [{
+        "RoleArn": deploy_scoped_monthly.DEPLOY_ROLE,
+        "RoleSessionName": "ScopedMonthlyRelease",
+    }]
+    assert session["aws_access_key_id"] == "a"
