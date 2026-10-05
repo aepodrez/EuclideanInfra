@@ -67,9 +67,20 @@ jobs:
           pip install -r requirements.txt
 
       - name: cdk deploy
+        if: ${{ !contains(github.event.head_commit.message, '[scoped-monthly-readiness]') }}
         working-directory: infra
         env:
           CDK_DEFAULT_ACCOUNT: "954976294836"
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
         run: |
           npx --yes aws-cdk@2 deploy --require-approval never
+
+      - name: Deploy scoped monthly readiness change set
+        if: ${{ contains(github.event.head_commit.message, '[scoped-monthly-readiness]') }}
+        working-directory: infra
+        env:
+          CDK_DEFAULT_ACCOUNT: "954976294836"
+          CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        run: |
+          npx --yes aws-cdk@2 synth
+          python tools/deploy_scoped_monthly.py --sha "$GITHUB_SHA" --execute
