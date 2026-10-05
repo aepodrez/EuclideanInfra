@@ -74,10 +74,24 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     assert processor["StartAt"] == "ChoosePredictorRuntime"
     choice = states["ChoosePredictorRuntime"]
     assert choice["Default"] == "InvokePredictor"
-    assert {part["StringEquals"] for part in choice["Choices"][0]["Or"]} == {
+    high_memory_predictors = [part["StringEquals"] for part in choice["Choices"][0]["Or"]]
+    assert len(high_memory_predictors) == len(set(high_memory_predictors))
+    assert set(high_memory_predictors) == {
         "CBOperProf", "EntMult", "EquityDuration", "ExchSwitch",
         "ChAssetTurnover", "Coskewness", "CustomerMomentum", "DelCOL",
         "DelDRC", "DivYieldST", "Frontier", "IndMom",
+        "GrLTNOA", "GrSaleToGrInv", "HerfAsset", "Herf",
+        "GrSaleToGrOverhead", "HerfBE", "Investment", "InvestPPEInv",
+        "MomOffSeason", "MS", "MomVol", "OperProfRD", "OPLeverage",
+        "OrderBacklog", "OrderBacklogChg", "PctAcc", "PctTotAcc",
+        "OScore", "PS", "RDIPO", "realestate", "sfe", "sinAlgo",
+        "SurpriseRD", "TotalAccruals", "VarCF", "XFIN",
+        "ZZ1_AnalystValue_AOP_PredictedFE_IntrinsicValue", "ZZ1_EBM_BPEBM",
+        "ZZ1_grcapx_grcapx1y_grcapx3y",
+        "ZZ1_RIO_MB_RIO_Disp_RIO_Turnover_RIO_Volatility",
+    }
+    assert set(high_memory_predictors) <= {
+        item["predictor"] for item in _definition()["States"]["PreparePredictors"]["Result"]
     }
     task = states["RunHighMemoryPredictor"]
     assert task["Resource"] == "arn:aws:states:::ecs:runTask.sync"
