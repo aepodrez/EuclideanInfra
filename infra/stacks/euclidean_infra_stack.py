@@ -220,6 +220,7 @@ class EuclideanInfraStack(Stack):
             "expire-common-crawl-work-90d": ("alternative-data/common-crawl/runs/", 90),
             "expire-company-web-archive-work-90d": ("alternative-data/company-web/archive/runs/", 90),
             "expire-task-logs-90d": ("data-ingress/logs/", 90),
+            "expire-storage-footprint-reports-90d": ("control-plane/storage-footprint/", 90),
         }
         lifecycle_rules.extend(
             s3.CfnBucket.RuleProperty(
@@ -319,6 +320,7 @@ class EuclideanInfraStack(Stack):
                 "RETENTION_MODE": "apply",
                 "RETENTION_STAGE": retention_stage,
                 "ORPHAN_QUARANTINE_DAYS": "30",
+                "MAX_ISSUES": "100",
                 "RUN_ROOTS": (
                     "pyData/Intermediate/_runs/,pyData/Predictors/_runs/,"
                     "alternative-data/_runs/,universe/_runs/"
@@ -352,10 +354,54 @@ class EuclideanInfraStack(Stack):
         ))
         events.Rule(
             self, "StorageRetentionReconcilerSchedule",
-            rule_name="euclidean-storage-retention-reconciler-daily",
-            description="Daily classification of immutable S3 dataset retention candidates",
-            schedule=events.Schedule.cron(minute="15", hour="7"),
+            rule_name="euclidean-storage-retention-reconciler-weekly",
+            description="Weekly classification of immutable S3 dataset retention candidates",
+            schedule=events.Schedule.cron(minute="15", hour="7", week_day="SUN"),
             targets=[event_targets.LambdaFunction(retention_function)],
+        )
+
+        footprint_function_name = "euclidean-storage-footprint-reporter"
+        footprint_log_group = logs.LogGroup(
+            self, "StorageFootprintReporterLogGroup",
+            log_group_name=f"/aws/lambda/{footprint_function_name}",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+        footprint_function = lambda_.Function(
+            self, "StorageFootprintReporter",
+            function_name=footprint_function_name,
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset(os.path.join(
+                LAMBDA_ASSETS_DIR, "storage_footprint_reporter"
+            )),
+            timeout=Duration.minutes(15),
+            memory_size=256,
+            reserved_concurrent_executions=1,
+            environment={
+                "S3_BUCKET": BUCKET_NAME,
+                "REPORT_PREFIX": "control-plane/storage-footprint/",
+                "MAX_OBJECTS": "5000000",
+                "MAX_LIST_REQUESTS": "6000",
+            },
+        )
+        footprint_function.node.add_dependency(footprint_log_group)
+        footprint_function.add_to_role_policy(iam.PolicyStatement(
+            sid="ListPipelineStorageMetadata",
+            actions=["s3:ListBucket"],
+            resources=[BUCKET_ARN],
+        ))
+        footprint_function.add_to_role_policy(iam.PolicyStatement(
+            sid="WriteStorageFootprintReports",
+            actions=["s3:PutObject"],
+            resources=[f"{BUCKET_ARN}/control-plane/storage-footprint/*"],
+        ))
+        events.Rule(
+            self, "StorageFootprintReporterSchedule",
+            rule_name="euclidean-storage-footprint-reporter-weekly",
+            description="Weekly bounded S3 metadata footprint report",
+            schedule=events.Schedule.cron(minute="0", hour="8", week_day="SUN"),
+            targets=[event_targets.LambdaFunction(footprint_function)],
         )
 
         # =====================================================================

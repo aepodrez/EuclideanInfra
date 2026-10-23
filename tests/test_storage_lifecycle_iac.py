@@ -81,3 +81,49 @@ def test_reconciler_applies_tags_and_has_no_delete_permission():
             actions.extend(value if isinstance(value, list) else [value])
     assert "s3:DeleteObject" not in actions
     assert "s3:PutObjectTagging" in actions
+
+
+def test_weekly_schedules_reporter_bounds_and_permissions():
+    template = _template()
+    rules = {
+        resource["Properties"].get("Name"): resource
+        for resource in template["Resources"].values()
+        if resource["Type"] == "AWS::Events::Rule"
+    }
+    assert rules["euclidean-storage-retention-reconciler-weekly"]["Properties"]["ScheduleExpression"] == "cron(15 7 ? * SUN *)"
+    assert rules["euclidean-storage-footprint-reporter-weekly"]["Properties"]["ScheduleExpression"] == "cron(0 8 ? * SUN *)"
+
+    function = next(
+        resource for resource in template["Resources"].values()
+        if resource["Type"] == "AWS::Lambda::Function"
+        and resource["Properties"].get("FunctionName") == "euclidean-storage-footprint-reporter"
+    )
+    assert function["Properties"]["MemorySize"] == 256
+    assert function["Properties"]["ReservedConcurrentExecutions"] == 1
+    assert function["Properties"]["Environment"]["Variables"]["MAX_OBJECTS"] == "5000000"
+    assert function["Properties"]["Environment"]["Variables"]["MAX_LIST_REQUESTS"] == "6000"
+
+    actions = []
+    report_put_scoped = False
+    for resource in template["Resources"].values():
+        if resource["Type"] != "AWS::IAM::Policy":
+            continue
+        for statement in resource["Properties"]["PolicyDocument"]["Statement"]:
+            value = statement.get("Action", [])
+            values = value if isinstance(value, list) else [value]
+            actions.extend(values)
+            resources = statement.get("Resource", [])
+            resources = resources if isinstance(resources, list) else [resources]
+            if "s3:PutObject" in values and any("control-plane/storage-footprint/*" in str(item) for item in resources):
+                report_put_scoped = True
+    assert report_put_scoped
+    assert "s3:DeleteObject" not in actions
+
+
+def test_report_lifecycle_does_not_change_existing_raw_archive_window():
+    template = _template()
+    bucket = next(resource for resource in template["Resources"].values()
+                  if resource["Type"] == "AWS::S3::Bucket")
+    rules = {row["Id"]: row for row in bucket["Properties"]["LifecycleConfiguration"]["Rules"]}
+    assert rules["expire-storage-footprint-reports-90d"]["ExpirationInDays"] == 90
+    assert rules["archive-gdelt-raw-90d"]["Transitions"][0]["TransitionInDays"] == 90

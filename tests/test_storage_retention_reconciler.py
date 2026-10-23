@@ -155,3 +155,36 @@ def test_complete_sharded_manifest_is_valid_only_when_all_shards_are_present():
     assert _valid_manifest(manifest, "option_snapshots", "2026-09-22")
     manifest["shard_manifests"].pop()
     assert not _valid_manifest(manifest, "option_snapshots", "2026-09-22")
+
+
+def test_metrics_include_storage_classes_current_and_newly_tagged_bytes():
+    now = datetime(2026, 9, 22, tzinfo=timezone.utc)
+    s3 = FakeS3(now)
+    prefix = "pyData/Intermediate/_runs/crsp_daily/"
+    _complete(s3, prefix, "crsp_daily", "current", current=True, days_old=1)
+    _complete(s3, prefix, "crsp_daily", "old", days_old=40)
+    s3.metadata[f"{prefix}runs/old/outputs/x"]["StorageClass"] = "GLACIER_IR"
+
+    result = reconcile_dataset(s3, "bucket", prefix, mode="apply", now=now)
+
+    assert result["current_bytes"] > 200_000
+    assert result["candidate_glacier_ir_bytes"] == 200_000
+    assert result["candidate_standard_bytes"] > 0
+    assert result["newly_tagged_bytes"] == result["candidate_bytes"]
+
+
+def test_malformed_issue_is_bounded_and_contains_no_object_keys():
+    now = datetime(2026, 9, 22, tzinfo=timezone.utc)
+    s3 = FakeS3(now)
+    prefix = "universe/_runs/universe/"
+    _complete(s3, prefix, "universe", "current", current=True, days_old=1)
+    s3.add(f"{prefix}runs/bad/manifest.json", {"status": "failed"}, days_old=90)
+    s3.add(f"{prefix}runs/bad/outputs/private", b"x", days_old=90, size=123)
+
+    result = reconcile_dataset(s3, "bucket", prefix, mode="audit", now=now)
+
+    assert result["malformed_run_bytes"] > 123
+    assert result["issues"] == [{
+        "dataset": "universe", "run_id": "bad", "reason": "invalid-historical-manifest",
+        "object_count": 2, "bytes": result["malformed_run_bytes"],
+    }]
