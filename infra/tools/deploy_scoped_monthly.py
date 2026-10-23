@@ -54,6 +54,11 @@ def _assumed_session(role_arn: str, session_name: str) -> boto3.Session:
     )
 
 
+def _deployment_session() -> boto3.Session:
+    """Backward-compatible scoped-release entry point used by release tests."""
+    return _assumed_session(DEPLOY_ROLE, "ScopedMonthlyRelease")
+
+
 def _canonical_policies(policies: list[dict]) -> list[dict]:
     """Compare IAM permissions, not CloudFormation's ordering of their lists."""
     normalized = copy.deepcopy(policies)
@@ -128,7 +133,7 @@ def main() -> None:
         if remote_sha != args.sha:
             raise RuntimeError("Scoped release requires the exact current origin/main SHA")
 
-    deployment = _assumed_session(DEPLOY_ROLE, "ScopedMonthlyRelease")
+    deployment = _deployment_session()
     cfn = deployment.client("cloudformation")
     current = _template(cfn.get_template(StackName=STACK, TemplateStage="Processed")["TemplateBody"])
     synthesized = json.loads(args.synthesized_template.read_text(encoding="utf-8"))
