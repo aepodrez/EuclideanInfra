@@ -253,12 +253,12 @@ class EuclideanInfraStack(Stack):
         ])
         raw_archive_rules = {
             "archive-pit-raw-30d": ("data-ingress/pit/", 30),
-            "archive-company-web-direct-raw-90d": ("alternative-data/company-web/direct/raw/", 90),
-            "archive-company-web-common-crawl-raw-90d": ("alternative-data/company-web/archive/raw/", 90),
-            "archive-gdelt-raw-90d": ("alternative-data/gdelt/raw/", 90),
-            "archive-ats-raw-90d": ("alternative-data/ats/raw/", 90),
-            "archive-youtube-raw-90d": ("alternative-data/youtube/raw/", 90),
-            "archive-common-crawl-raw-90d": ("alternative-data/common-crawl/raw/", 90),
+            "archive-company-web-direct-raw-30d": ("alternative-data/company-web/direct/raw/", 30),
+            "archive-company-web-common-crawl-raw-30d": ("alternative-data/company-web/archive/raw/", 30),
+            "archive-gdelt-raw-30d": ("alternative-data/gdelt/raw/", 30),
+            "archive-ats-raw-30d": ("alternative-data/ats/raw/", 30),
+            "archive-youtube-raw-30d": ("alternative-data/youtube/raw/", 30),
+            "archive-common-crawl-raw-30d": ("alternative-data/common-crawl/raw/", 30),
         }
         lifecycle_rules.extend(
             s3.CfnBucket.RuleProperty(

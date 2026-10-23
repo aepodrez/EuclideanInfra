@@ -130,10 +130,24 @@ def test_weekly_schedules_reporter_bounds_and_permissions():
     assert "euclidean-storage-retention-reconciler-daily" in serialized
 
 
-def test_report_lifecycle_does_not_change_existing_raw_archive_window():
+def test_raw_archive_lifecycle_uses_30_days_and_glacier_flexible():
     template = _template()
     bucket = next(resource for resource in template["Resources"].values()
                   if resource["Type"] == "AWS::S3::Bucket")
     rules = {row["Id"]: row for row in bucket["Properties"]["LifecycleConfiguration"]["Rules"]}
     assert rules["expire-storage-footprint-reports-90d"]["ExpirationInDays"] == 90
-    assert rules["archive-gdelt-raw-90d"]["Transitions"][0]["TransitionInDays"] == 90
+    expected = {
+        "archive-pit-raw-30d": "data-ingress/pit/",
+        "archive-company-web-direct-raw-30d": "alternative-data/company-web/direct/raw/",
+        "archive-company-web-common-crawl-raw-30d": "alternative-data/company-web/archive/raw/",
+        "archive-gdelt-raw-30d": "alternative-data/gdelt/raw/",
+        "archive-ats-raw-30d": "alternative-data/ats/raw/",
+        "archive-youtube-raw-30d": "alternative-data/youtube/raw/",
+        "archive-common-crawl-raw-30d": "alternative-data/common-crawl/raw/",
+    }
+    for rule_id, prefix in expected.items():
+        assert rules[rule_id]["Prefix"] == prefix
+        assert rules[rule_id]["ObjectSizeGreaterThan"] == 131072
+        assert rules[rule_id]["Transitions"] == [{
+            "StorageClass": "GLACIER", "TransitionInDays": 30,
+        }]
