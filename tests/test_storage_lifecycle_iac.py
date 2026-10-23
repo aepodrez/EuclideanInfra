@@ -119,6 +119,16 @@ def test_weekly_schedules_reporter_bounds_and_permissions():
     assert report_put_scoped
     assert "s3:DeleteObject" not in actions
 
+    custom_resources = [
+        resource for resource in template["Resources"].values()
+        if resource["Type"] == "Custom::AWS"
+    ]
+    calls = [resource["Properties"].get("Create") for resource in custom_resources]
+    serialized = " ".join(str(value) for value in calls)
+    assert "removeTargets" in serialized
+    assert "deleteRule" in serialized
+    assert "euclidean-storage-retention-reconciler-daily" in serialized
+
 
 def test_report_lifecycle_does_not_change_existing_raw_archive_window():
     template = _template()

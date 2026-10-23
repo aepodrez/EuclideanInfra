@@ -60,6 +60,7 @@ from aws_cdk import (
     aws_sns as sns,
     aws_ssm as ssm,
     aws_stepfunctions as sfn,
+    custom_resources as cr,
 )
 from constructs import Construct
 
@@ -352,13 +353,59 @@ class EuclideanInfraStack(Stack):
             ],
             resources=run_resources,
         ))
-        events.Rule(
+        retention_schedule = events.Rule(
             self, "StorageRetentionReconcilerSchedule",
             rule_name="euclidean-storage-retention-reconciler-weekly",
             description="Weekly classification of immutable S3 dataset retention candidates",
             schedule=events.Schedule.cron(minute="15", hour="7", week_day="SUN"),
             targets=[event_targets.LambdaFunction(retention_function)],
         )
+
+        # This rule was originally imported with Retain, so changing its
+        # physical name leaves the former daily rule outside the stack. Remove
+        # that retained resource through CloudFormation rather than creating
+        # console-only drift or continuing duplicate daily scans.
+        legacy_rule_name = "euclidean-storage-retention-reconciler-daily"
+        cleanup_policy = cr.AwsCustomResourcePolicy.from_statements([
+            iam.PolicyStatement(
+                actions=["events:RemoveTargets", "events:DeleteRule"],
+                resources=[f"arn:aws:events:{REGION}:{ACCOUNT}:rule/{legacy_rule_name}"],
+            ),
+        ])
+        remove_legacy_target = cr.AwsCustomResource(
+            self, "RemoveLegacyDailyRetentionTarget",
+            on_create=cr.AwsSdkCall(
+                service="EventBridge", action="removeTargets",
+                parameters={"Rule": legacy_rule_name, "Ids": ["Target0"], "Force": True},
+                physical_resource_id=cr.PhysicalResourceId.of("legacy-retention-target-removed-v1"),
+                ignore_error_codes_matching="ResourceNotFoundException",
+            ),
+            on_update=cr.AwsSdkCall(
+                service="EventBridge", action="removeTargets",
+                parameters={"Rule": legacy_rule_name, "Ids": ["Target0"], "Force": True},
+                physical_resource_id=cr.PhysicalResourceId.of("legacy-retention-target-removed-v1"),
+                ignore_error_codes_matching="ResourceNotFoundException",
+            ),
+            policy=cleanup_policy,
+        )
+        remove_legacy_target.node.add_dependency(retention_schedule)
+        delete_legacy_rule = cr.AwsCustomResource(
+            self, "DeleteLegacyDailyRetentionRule",
+            on_create=cr.AwsSdkCall(
+                service="EventBridge", action="deleteRule",
+                parameters={"Name": legacy_rule_name, "Force": True},
+                physical_resource_id=cr.PhysicalResourceId.of("legacy-retention-rule-deleted-v1"),
+                ignore_error_codes_matching="ResourceNotFoundException",
+            ),
+            on_update=cr.AwsSdkCall(
+                service="EventBridge", action="deleteRule",
+                parameters={"Name": legacy_rule_name, "Force": True},
+                physical_resource_id=cr.PhysicalResourceId.of("legacy-retention-rule-deleted-v1"),
+                ignore_error_codes_matching="ResourceNotFoundException",
+            ),
+            policy=cleanup_policy,
+        )
+        delete_legacy_rule.node.add_dependency(remove_legacy_target)
 
         footprint_function_name = "euclidean-storage-footprint-reporter"
         footprint_log_group = logs.LogGroup(
