@@ -18,6 +18,7 @@
           "mode": "reconcile",
           "preflight.$": "$.monthly_context.preflight",
           "predictor_results.$": "$.predictor_results",
+          "quality_migration.$": "$.monthly_context.quality_migration",
           "run_id.$": "$.monthly_context.run_id",
           "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
           "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",

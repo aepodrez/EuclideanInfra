@@ -162,6 +162,7 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
         "mode": "reconcile",
         "preflight.$": "$.monthly_context.preflight",
         "predictor_results.$": "$.predictor_results",
+        "quality_migration.$": "$.monthly_context.quality_migration",
         "rivol_status.$": "$.rivol_status",
         "run_id.$": "$.monthly_context.run_id",
         "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
