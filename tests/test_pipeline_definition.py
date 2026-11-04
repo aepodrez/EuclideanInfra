@@ -328,3 +328,24 @@ def test_portfolio_consumes_exact_alpha_and_catalog_lineage():
         "$.predictor_availability_result.Payload.output_sha256"
     )
     assert "portfolio-construction/runs/{}/" in environment["S3_OUTPUT_KEY"]
+
+
+def test_portfolio_exit_and_no_trade_execution_are_verified_before_success():
+    states = _definition()["States"]
+    portfolio = states["RunPortfolioConstruction"]
+    assert portfolio["Next"] == "CheckPortfolioTaskExit"
+    assert "ResultSelector" not in portfolio
+    assert states["CheckPortfolioTaskExit"]["Choices"] == [{
+        "Variable": "$.portfolio_result.Containers[0].ExitCode",
+        "NumericEquals": 0,
+        "Next": "RunExecutionDryRun",
+    }]
+    assert states["CheckPortfolioTaskExit"]["Default"] == "PortfolioConstructionFailed"
+    execution = states["RunExecutionDryRun"]["Parameters"]["Payload"]
+    assert execution["dry_run"] is True
+    assert execution["portfolio_weights_path.$"] == (
+        "States.Format('portfolio-construction/runs/{}/optimal_portfolio.csv', $.monthly_context.run_id)"
+    )
+    assert execution["alpha_sha256.$"] == "$.alpha_model_result.output_sha256"
+    assert "live_execution_approved" not in execution
+    assert states["CheckExecutionDryRun"]["Choices"][0]["Next"] == "MonthlyProductionPrepared"
