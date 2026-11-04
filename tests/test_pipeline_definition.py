@@ -101,6 +101,27 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     ]
     assert task["TimeoutSeconds"] == 900
     assert task["Catch"][0]["Next"] == "RecordPredictorFailure"
+    assert task["Retry"] == [{
+        "ErrorEquals": ["States.TaskFailed"],
+        "IntervalSeconds": 10,
+        "BackoffRate": 2,
+        "MaxAttempts": 2,
+    }]
+    assert states["CheckHighMemoryPredictorExit"]["Choices"] == [{
+        "Variable": "$.ecs_result.Containers[0].ExitCode",
+        "NumericEquals": 0,
+        "Next": "HighMemoryPredictorComplete",
+    }]
+    assert states["HighMemoryPredictorComplete"] == {
+        "Type": "Pass",
+        "Parameters": {
+            "as_of_month.$": "$.as_of_month",
+            "predictor.$": "$.predictor",
+            "run_id.$": "$.run_id",
+            "status": "success",
+        },
+        "End": True,
+    }
     assert states["CheckHighMemoryPredictorExit"]["Default"] == "RecordHighMemoryPredictorFailure"
     assert states["InvokePredictor"]["Retry"][0]["ErrorEquals"] == [
         "Lambda.ServiceException", "Lambda.AWSLambdaException",

@@ -1224,6 +1224,9 @@
             "ResultPath": "$.ecs_result",
             "TimeoutSeconds": 900,
             "Next": "CheckHighMemoryPredictorExit",
+            "Retry": [
+              {"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 10, "BackoffRate": 2, "MaxAttempts": 2}
+            ],
             "Catch": [
               {"ErrorEquals": ["States.ALL"], "ResultPath": "$.failure", "Next": "RecordPredictorFailure"}
             ]
@@ -1231,11 +1234,20 @@
           "CheckHighMemoryPredictorExit": {
             "Type": "Choice",
             "Choices": [
-              {"Variable": "$.ecs_result.Tasks[0].Containers[0].ExitCode", "NumericEquals": 0, "Next": "HighMemoryPredictorComplete"}
+              {"Variable": "$.ecs_result.Containers[0].ExitCode", "NumericEquals": 0, "Next": "HighMemoryPredictorComplete"}
             ],
             "Default": "RecordHighMemoryPredictorFailure"
           },
-          "HighMemoryPredictorComplete": {"Type": "Succeed"},
+          "HighMemoryPredictorComplete": {
+            "Type": "Pass",
+            "Parameters": {
+              "as_of_month.$": "$.as_of_month",
+              "predictor.$": "$.predictor",
+              "run_id.$": "$.run_id",
+              "status": "success"
+            },
+            "End": true
+          },
           "RecordHighMemoryPredictorFailure": {
             "Type": "Pass",
             "Parameters": {
