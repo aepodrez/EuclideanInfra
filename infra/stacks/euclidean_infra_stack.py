@@ -1062,7 +1062,7 @@ class EuclideanInfraStack(Stack):
             ff_task = ecs.FargateTaskDefinition(
                 self, "FfTaskDef",
                 family=FF_FAMILY,
-                cpu=2048,
+                cpu=1024,
                 memory_limit_mib=8192,
                 execution_role=iam.Role.from_role_arn(
                     self, "FfExecRoleRef", role_arn("euclidean-build-ff-exec"), mutable=False),
