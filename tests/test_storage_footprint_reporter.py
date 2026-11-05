@@ -2,11 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from lambdas.storage_footprint_reporter.lambda_function import (
-    ScanLimitExceeded,
-    _group,
-    build_report,
-)
+from lambdas.storage_footprint_reporter import lambda_function as reporter
+from lambdas.storage_footprint_reporter.lambda_function import _group, build_report
 
 
 class FakeS3:
@@ -43,11 +40,15 @@ def test_report_aggregates_classes_growth_eligibility_and_cost():
 
     report = build_report(s3, "bucket", now)
 
-    assert report["scan"] == {
-        "status": "complete", "truncated": False, "reason": None, "pages": 1,
-        "estimated_list_cost_usd": 0.000005, "max_objects": 5_000_000,
-        "max_list_requests": 6_000,
-    }
+    assert report["scan"]["status"] == "complete"
+    assert report["scan"]["truncated"] is False
+    assert report["scan"]["reason"] is None
+    assert report["scan"]["pages"] == 1
+    assert report["scan"]["estimated_list_cost_usd"] == 0.000005
+    assert report["scan"]["max_objects"] == 5_000_000
+    assert report["scan"]["max_list_requests"] == 6_000
+    assert report["scan"]["workers"] == 8
+    assert report["scan"]["unfinished_prefixes"] == []
     assert report["totals"]["bytes"] == 900_050
     assert report["totals"]["new_7d_standard_bytes"] == 300_000
     assert report["groups"]["GDELT"]["transition_eligible_bytes"] == 200_000
@@ -65,5 +66,54 @@ def test_scan_caps_mark_report_truncated():
     assert report["scan"]["pages"] == 2
 
 
-def test_exception_type_is_visible_failure():
-    assert issubclass(ScanLimitExceeded, RuntimeError)
+class PrefixS3:
+    def __init__(self, now):
+        self.now = now
+        self.puts = []
+
+    def list_objects_v2(self, **kwargs):
+        prefix = kwargs.get("Prefix")
+        if prefix is None:
+            return {
+                "Contents": [{"Key": "root.json", "Size": 1, "LastModified": self.now}],
+                "CommonPrefixes": [{"Prefix": "a/"}, {"Prefix": "b/"}],
+                "IsTruncated": False,
+            }
+        return {
+            "Contents": [{
+                "Key": f"{prefix}object", "Size": 10, "LastModified": self.now,
+            }],
+            "IsTruncated": False,
+        }
+
+    def put_object(self, **kwargs):
+        self.puts.append(kwargs["Key"])
+
+
+def test_parallel_prefix_scan_includes_root_objects_exactly_once():
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+    report = build_report(PrefixS3(now), "bucket", now, max_workers=2)
+    assert report["scan"]["status"] == "complete"
+    assert report["scan"]["pages"] == 3
+    assert report["totals"]["objects"] == 3
+    assert report["totals"]["bytes"] == 21
+
+
+def test_deadline_writes_versioned_diagnostic_without_replacing_latest(monkeypatch):
+    now = datetime.now(timezone.utc)
+    s3 = PrefixS3(now)
+    monkeypatch.setattr(reporter, "_s3", s3)
+    monkeypatch.setattr(reporter, "BUCKET", "bucket")
+    monkeypatch.setattr(reporter, "REPORT_PREFIX", "reports/")
+
+    class Context:
+        @staticmethod
+        def get_remaining_time_in_millis():
+            return 119_000
+
+    result = reporter.lambda_handler({}, Context())
+    assert result["scan"]["status"] == "incomplete"
+    assert result["scan"]["reason"] == "deadline-reserve"
+    assert len(s3.puts) == 1
+    assert s3.puts[0].startswith("reports/reports/")
+    assert "reports/latest.json" not in s3.puts
