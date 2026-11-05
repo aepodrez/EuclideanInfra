@@ -69,6 +69,12 @@ def test_predictor_map_uses_item_payload_path_and_collects_branch_failures():
 
 
 def test_high_memory_predictors_use_bounded_on_demand_task():
+    top = _definition()["States"]
+    assert top["FilterCompletedPredictors"]["Next"] == "CheckHighMemoryCanary"
+    assert top["CheckHighMemoryCanary"]["Default"] == "RunPredictors"
+    assert top["PrepareHighMemoryCanary"]["Parameters"]["preflight"] is True
+    assert top["RunHighMemoryCanary"]["TimeoutSeconds"] == 900
+    assert top["CheckHighMemoryCanaryExit"]["Default"] == "HighMemoryCanaryFailed"
     processor = _definition()["States"]["RunPredictors"]["ItemProcessor"]
     states = processor["States"]
     assert processor["StartAt"] == "ChoosePredictorRuntime"
@@ -151,7 +157,7 @@ def test_monthly_start_waits_for_exact_source_readiness_and_seals_dispatch():
     dispatch = states["FilterCompletedPredictors"]
     assert dispatch["Parameters"]["Payload"]["expected.$"] == "$.predictors"
     assert dispatch["Parameters"]["Payload"]["mode"] == "dispatch"
-    assert dispatch["Next"] == "RunPredictors"
+    assert dispatch["Next"] == "CheckHighMemoryCanary"
 
 
 def test_availability_reconciliation_gates_alpha_on_potent_catalog():
@@ -351,4 +357,17 @@ def test_portfolio_exit_and_no_trade_execution_are_verified_before_success():
     )
     assert execution["alpha_sha256.$"] == "$.alpha_model_result.output_sha256"
     assert "live_execution_approved" not in execution
-    assert states["CheckExecutionDryRun"]["Choices"][0]["Next"] == "MonthlyProductionPrepared"
+    assert states["CheckExecutionDryRun"]["Choices"][0]["Next"] == "ResolveNextPaperOpen"
+    assert states["WaitForNextPaperOpen"]["TimestampPath"] == (
+        "$.paper_open_result.Payload.next_market_open"
+    )
+    submission = states["SubmitPaperOrders"]["Parameters"]["Payload"]
+    assert submission["paper_execution_approved"] is True
+    assert submission["dry_run"] is False
+    assert submission["side"] == "all"
+    assert states["CheckPaperReconciliation"]["Choices"][0]["Next"] == (
+        "MonthlyProductionComplete"
+    )
+    assert states["CheckPaperReconciliation"]["Choices"][1]["Next"] == (
+        "WaitForPaperFills"
+    )

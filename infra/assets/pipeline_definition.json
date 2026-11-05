@@ -975,7 +975,68 @@
         }
       },
       "ResultPath": "$.predictor_dispatch",
-      "Next": "RunPredictors"
+      "Next": "CheckHighMemoryCanary"
+    },
+    "CheckHighMemoryCanary": {
+      "Type": "Choice",
+      "Choices": [{
+        "Variable": "$.predictor_dispatch.Payload.high_memory_canary.predictor",
+        "IsPresent": true,
+        "Next": "PrepareHighMemoryCanary"
+      }],
+      "Default": "RunPredictors"
+    },
+    "PrepareHighMemoryCanary": {
+      "Type": "Pass",
+      "Parameters": {
+        "as_of_month.$": "$.monthly_context.as_of_month",
+        "predictor.$": "$.predictor_dispatch.Payload.high_memory_canary.predictor",
+        "run_id.$": "$.monthly_context.run_id",
+        "signal_master_key.$": "$.signal_master_result.Payload.signal_master_key",
+        "signal_master_sha256.$": "$.signal_master_result.Payload.signal_master_sha256",
+        "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
+        "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
+        "quality_migration.$": "$.monthly_context.quality_migration",
+        "preflight": true
+      },
+      "ResultPath": "$.high_memory_canary_event",
+      "Next": "RunHighMemoryCanary"
+    },
+    "RunHighMemoryCanary": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": {
+        "Cluster": "arn:aws:ecs:us-east-1:954976294836:cluster/euclidean-cluster",
+        "TaskDefinition": "euclidean-monthly-predictor-high-memory",
+        "LaunchType": "FARGATE",
+        "NetworkConfiguration": {"AwsvpcConfiguration": {
+          "AssignPublicIp": "ENABLED",
+          "SecurityGroups": ["sg-010ca983e1744a0f9"],
+          "Subnets": ["subnet-0cb23cb16a893e69b", "subnet-0c7d5564c847ec3b9"]
+        }},
+        "Overrides": {"ContainerOverrides": [{
+          "Name": "monthly-predictor-high-memory",
+          "Environment": [{"Name": "PREDICTOR_EVENT_JSON", "Value.$": "States.JsonToString($.high_memory_canary_event)"}]
+        }]}
+      },
+      "ResultPath": "$.high_memory_canary_result",
+      "TimeoutSeconds": 900,
+      "Next": "CheckHighMemoryCanaryExit",
+      "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "HighMemoryCanaryFailed"}]
+    },
+    "CheckHighMemoryCanaryExit": {
+      "Type": "Choice",
+      "Choices": [{
+        "Variable": "$.high_memory_canary_result.Containers[0].ExitCode",
+        "NumericEquals": 0,
+        "Next": "RunPredictors"
+      }],
+      "Default": "HighMemoryCanaryFailed"
+    },
+    "HighMemoryCanaryFailed": {
+      "Type": "Fail",
+      "Error": "HighMemoryCanaryFailed",
+      "Cause": "Exact sealed-input high-memory preflight failed; predictor wave was not started."
     },
     "RunAlphaModel": {
       "Next": "CheckAlphaModelResult",
@@ -1184,7 +1245,7 @@
             {"Variable": "$.execution_dry_run_result.Payload.execution_status", "StringEquals": "ok"},
             {"Variable": "$.execution_dry_run_result.Payload.dry_run", "BooleanEquals": true}
           ],
-          "Next": "MonthlyProductionPrepared"
+          "Next": "ResolveNextPaperOpen"
         }
       ],
       "Default": "ExecutionDryRunFailed"
@@ -1194,9 +1255,112 @@
       "Error": "ExecutionDryRunFailed",
       "Cause": "The pretrade no-order execution check did not pass."
     },
-    "MonthlyProductionPrepared": {
-      "Type": "Succeed"
+    "ResolveNextPaperOpen": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-execution-model",
+        "Payload": {
+          "mode": "next_open",
+          "s3_bucket": "euclidean-pipeline-954976294836",
+          "run_id.$": "$.monthly_context.run_id",
+          "as_of_month.$": "$.monthly_context.as_of_month",
+          "alpha_sha256.$": "$.alpha_model_result.output_sha256",
+          "portfolio_weights_path.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio.csv', $.monthly_context.run_id)",
+          "portfolio_meta_path.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio_meta.json', $.monthly_context.run_id)"
+        }
+      },
+      "ResultPath": "$.paper_open_result",
+      "Next": "CheckNextPaperOpen"
     },
+    "CheckNextPaperOpen": {
+      "Type": "Choice",
+      "Choices": [{"And": [
+        {"Variable": "$.paper_open_result.Payload.statusCode", "NumericEquals": 200},
+        {"Variable": "$.paper_open_result.Payload.next_market_open", "IsPresent": true}
+      ], "Next": "WaitForNextPaperOpen"}],
+      "Default": "PaperExecutionFailed"
+    },
+    "WaitForNextPaperOpen": {
+      "Type": "Wait",
+      "TimestampPath": "$.paper_open_result.Payload.next_market_open",
+      "Next": "SubmitPaperOrders"
+    },
+    "SubmitPaperOrders": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-execution-model",
+        "Payload": {
+          "mode": "submit",
+          "paper_execution_approved": true,
+          "dry_run": false,
+          "side": "all",
+          "s3_bucket": "euclidean-pipeline-954976294836",
+          "run_id.$": "$.monthly_context.run_id",
+          "as_of_month.$": "$.monthly_context.as_of_month",
+          "alpha_sha256.$": "$.alpha_model_result.output_sha256",
+          "portfolio_weights_path.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio.csv', $.monthly_context.run_id)",
+          "portfolio_meta_path.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio_meta.json', $.monthly_context.run_id)"
+        }
+      },
+      "ResultPath": "$.paper_submit_result",
+      "Next": "CheckPaperSubmit"
+    },
+    "CheckPaperSubmit": {
+      "Type": "Choice",
+      "Choices": [{"And": [
+        {"Variable": "$.paper_submit_result.Payload.statusCode", "NumericEquals": 200},
+        {"Variable": "$.paper_submit_result.Payload.execution_status", "StringEquals": "pending_fills"},
+        {"Variable": "$.paper_submit_result.Payload.order_receipt_sha256", "IsPresent": true}
+      ], "Next": "WaitForPaperFills"}],
+      "Default": "PaperExecutionFailed"
+    },
+    "WaitForPaperFills": {
+      "Type": "Wait",
+      "Seconds": 120,
+      "Next": "ReconcilePaperOrders"
+    },
+    "ReconcilePaperOrders": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-execution-model",
+        "Payload": {
+          "mode": "reconcile",
+          "s3_bucket": "euclidean-pipeline-954976294836",
+          "run_id.$": "$.monthly_context.run_id",
+          "as_of_month.$": "$.monthly_context.as_of_month",
+          "alpha_sha256.$": "$.alpha_model_result.output_sha256",
+          "portfolio_weights_path.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio.csv', $.monthly_context.run_id)",
+          "portfolio_meta_path.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio_meta.json', $.monthly_context.run_id)",
+          "order_receipt_key.$": "$.paper_submit_result.Payload.order_receipt_key",
+          "order_receipt_sha256.$": "$.paper_submit_result.Payload.order_receipt_sha256"
+        }
+      },
+      "ResultPath": "$.paper_reconcile_result",
+      "Next": "CheckPaperReconciliation"
+    },
+    "CheckPaperReconciliation": {
+      "Type": "Choice",
+      "Choices": [
+        {"And": [
+          {"Variable": "$.paper_reconcile_result.Payload.statusCode", "NumericEquals": 200},
+          {"Variable": "$.paper_reconcile_result.Payload.execution_status", "StringEquals": "complete"},
+          {"Variable": "$.paper_reconcile_result.Payload.reconciliation_sha256", "IsPresent": true}
+        ], "Next": "MonthlyProductionComplete"},
+        {"And": [
+          {"Variable": "$.paper_reconcile_result.Payload.statusCode", "NumericEquals": 202},
+          {"Variable": "$.paper_reconcile_result.Payload.execution_status", "StringEquals": "pending_fills"}
+        ], "Next": "WaitForPaperFills"}
+      ],
+      "Default": "PaperExecutionFailed"
+    },
+    "PaperExecutionFailed": {
+      "Type": "Fail", "Error": "PaperExecutionFailed",
+      "Cause": "Paper orders or fill/position reconciliation require review."
+    },
+    "MonthlyProductionComplete": {"Type": "Succeed"},
     "RunPredictors": {
       "ItemSelector": {
         "as_of_month.$": "$.monthly_context.as_of_month",
