@@ -1,5 +1,5 @@
 {
-  "Comment": "Euclidean monthly decision pipeline: SignalMaster -> predictors -> alpha -> portfolio",
+  "Comment": "Euclidean monthly decision pipeline: SignalMaster -> predictors -> alpha -> portfolio -> no-trade execution check",
   "StartAt": "ResolveMonthlyContext",
   "States": {
     "AlphaModelFailed": {
@@ -18,6 +18,7 @@
           "mode": "reconcile",
           "preflight.$": "$.monthly_context.preflight",
           "predictor_results.$": "$.predictor_results",
+          "quality_migration.$": "$.monthly_context.quality_migration",
           "run_id.$": "$.monthly_context.run_id",
           "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
           "source_snapshot_sha256.$": "$.monthly_context.source_snapshot_sha256",
@@ -1020,7 +1021,7 @@
       "Type": "Task"
     },
     "RunPortfolioConstruction": {
-      "End": true,
+      "Next": "CheckPortfolioTaskExit",
       "Parameters": {
         "Cluster": "arn:aws:ecs:us-east-1:954976294836:cluster/euclidean-cluster",
         "LaunchType": "FARGATE",
@@ -1109,9 +1110,6 @@
       },
       "Resource": "arn:aws:states:::ecs:runTask.sync",
       "ResultPath": "$.portfolio_result",
-      "ResultSelector": {
-        "statusCode": 200
-      },
       "Retry": [
         {
           "BackoffRate": 2,
@@ -1123,6 +1121,77 @@
         }
       ],
       "Type": "Task"
+    },
+    "CheckPortfolioTaskExit": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.portfolio_result.Containers[0].ExitCode",
+          "NumericEquals": 0,
+          "Next": "RunExecutionDryRun"
+        }
+      ],
+      "Default": "PortfolioConstructionFailed"
+    },
+    "PortfolioConstructionFailed": {
+      "Type": "Fail",
+      "Error": "PortfolioConstructionFailed",
+      "Cause": "Portfolio task stopped without a successful container exit."
+    },
+    "RunExecutionDryRun": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:us-east-1:954976294836:function:euclidean-execution-model",
+        "Payload": {
+          "s3_bucket": "euclidean-pipeline-954976294836",
+          "run_id.$": "$.monthly_context.run_id",
+          "as_of_month.$": "$.monthly_context.as_of_month",
+          "alpha_sha256.$": "$.alpha_model_result.output_sha256",
+          "portfolio_weights_path.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio.csv', $.monthly_context.run_id)",
+          "portfolio_meta_path.$": "States.Format('portfolio-construction/runs/{}/optimal_portfolio_meta.json', $.monthly_context.run_id)",
+          "output_key.$": "States.Format('execution-model/runs/{}/pretrade_dry_run.json', $.monthly_context.run_id)",
+          "dry_run": true,
+          "side": "all"
+        }
+      },
+      "ResultPath": "$.execution_dry_run_result",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 10,
+          "BackoffRate": 2,
+          "MaxAttempts": 2
+        }
+      ],
+      "Next": "CheckExecutionDryRun"
+    },
+    "CheckExecutionDryRun": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            {"Variable": "$.execution_dry_run_result.Payload.statusCode", "NumericEquals": 200},
+            {"Variable": "$.execution_dry_run_result.Payload.execution_status", "StringEquals": "ok"},
+            {"Variable": "$.execution_dry_run_result.Payload.dry_run", "BooleanEquals": true}
+          ],
+          "Next": "MonthlyProductionPrepared"
+        }
+      ],
+      "Default": "ExecutionDryRunFailed"
+    },
+    "ExecutionDryRunFailed": {
+      "Type": "Fail",
+      "Error": "ExecutionDryRunFailed",
+      "Cause": "The pretrade no-order execution check did not pass."
+    },
+    "MonthlyProductionPrepared": {
+      "Type": "Succeed"
     },
     "RunPredictors": {
       "ItemSelector": {
@@ -1224,6 +1293,9 @@
             "ResultPath": "$.ecs_result",
             "TimeoutSeconds": 900,
             "Next": "CheckHighMemoryPredictorExit",
+            "Retry": [
+              {"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 10, "BackoffRate": 2, "MaxAttempts": 2}
+            ],
             "Catch": [
               {"ErrorEquals": ["States.ALL"], "ResultPath": "$.failure", "Next": "RecordPredictorFailure"}
             ]
@@ -1231,11 +1303,20 @@
           "CheckHighMemoryPredictorExit": {
             "Type": "Choice",
             "Choices": [
-              {"Variable": "$.ecs_result.Tasks[0].Containers[0].ExitCode", "NumericEquals": 0, "Next": "HighMemoryPredictorComplete"}
+              {"Variable": "$.ecs_result.Containers[0].ExitCode", "NumericEquals": 0, "Next": "HighMemoryPredictorComplete"}
             ],
             "Default": "RecordHighMemoryPredictorFailure"
           },
-          "HighMemoryPredictorComplete": {"Type": "Succeed"},
+          "HighMemoryPredictorComplete": {
+            "Type": "Pass",
+            "Parameters": {
+              "as_of_month.$": "$.as_of_month",
+              "predictor.$": "$.predictor",
+              "run_id.$": "$.run_id",
+              "status": "success"
+            },
+            "End": true
+          },
           "RecordHighMemoryPredictorFailure": {
             "Type": "Pass",
             "Parameters": {

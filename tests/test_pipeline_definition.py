@@ -101,6 +101,27 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     ]
     assert task["TimeoutSeconds"] == 900
     assert task["Catch"][0]["Next"] == "RecordPredictorFailure"
+    assert task["Retry"] == [{
+        "ErrorEquals": ["States.TaskFailed"],
+        "IntervalSeconds": 10,
+        "BackoffRate": 2,
+        "MaxAttempts": 2,
+    }]
+    assert states["CheckHighMemoryPredictorExit"]["Choices"] == [{
+        "Variable": "$.ecs_result.Containers[0].ExitCode",
+        "NumericEquals": 0,
+        "Next": "HighMemoryPredictorComplete",
+    }]
+    assert states["HighMemoryPredictorComplete"] == {
+        "Type": "Pass",
+        "Parameters": {
+            "as_of_month.$": "$.as_of_month",
+            "predictor.$": "$.predictor",
+            "run_id.$": "$.run_id",
+            "status": "success",
+        },
+        "End": True,
+    }
     assert states["CheckHighMemoryPredictorExit"]["Default"] == "RecordHighMemoryPredictorFailure"
     assert states["InvokePredictor"]["Retry"][0]["ErrorEquals"] == [
         "Lambda.ServiceException", "Lambda.AWSLambdaException",
@@ -141,6 +162,7 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
         "mode": "reconcile",
         "preflight.$": "$.monthly_context.preflight",
         "predictor_results.$": "$.predictor_results",
+        "quality_migration.$": "$.monthly_context.quality_migration",
         "rivol_status.$": "$.rivol_status",
         "run_id.$": "$.monthly_context.run_id",
         "source_snapshot_key.$": "$.monthly_context.source_snapshot_key",
@@ -306,3 +328,24 @@ def test_portfolio_consumes_exact_alpha_and_catalog_lineage():
         "$.predictor_availability_result.Payload.output_sha256"
     )
     assert "portfolio-construction/runs/{}/" in environment["S3_OUTPUT_KEY"]
+
+
+def test_portfolio_exit_and_no_trade_execution_are_verified_before_success():
+    states = _definition()["States"]
+    portfolio = states["RunPortfolioConstruction"]
+    assert portfolio["Next"] == "CheckPortfolioTaskExit"
+    assert "ResultSelector" not in portfolio
+    assert states["CheckPortfolioTaskExit"]["Choices"] == [{
+        "Variable": "$.portfolio_result.Containers[0].ExitCode",
+        "NumericEquals": 0,
+        "Next": "RunExecutionDryRun",
+    }]
+    assert states["CheckPortfolioTaskExit"]["Default"] == "PortfolioConstructionFailed"
+    execution = states["RunExecutionDryRun"]["Parameters"]["Payload"]
+    assert execution["dry_run"] is True
+    assert execution["portfolio_weights_path.$"] == (
+        "States.Format('portfolio-construction/runs/{}/optimal_portfolio.csv', $.monthly_context.run_id)"
+    )
+    assert execution["alpha_sha256.$"] == "$.alpha_model_result.output_sha256"
+    assert "live_execution_approved" not in execution
+    assert states["CheckExecutionDryRun"]["Choices"][0]["Next"] == "MonthlyProductionPrepared"
