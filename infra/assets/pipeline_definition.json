@@ -33,7 +33,10 @@
         {
           "BackoffRate": 2,
           "ErrorEquals": [
-            "States.ALL"
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
           ],
           "IntervalSeconds": 10,
           "MaxAttempts": 2
@@ -43,6 +46,16 @@
     },
     "CheckPredictorAvailability": {
       "Choices": [
+        {
+          "Variable": "$.predictor_availability_result.Payload.status",
+          "StringEquals": "terminal_failure",
+          "Next": "PredictorAvailabilityTerminalFailure"
+        },
+        {
+          "Variable": "$.predictor_availability_result.Payload.status",
+          "StringEquals": "deferred_dependency",
+          "Next": "PredictorAvailabilityDeferred"
+        },
         {
           "And": [
             {
@@ -87,6 +100,16 @@
     "PredictorAvailabilityFailed": {
       "Cause": "Predictor availability is incomplete, failed quality, or has no active potent predictor.",
       "Error": "PredictorAvailabilityFailed",
+      "Type": "Fail"
+    },
+    "PredictorAvailabilityTerminalFailure": {
+      "Cause": "Predictor availability contains a sealed deterministic quality failure.",
+      "Error": "PredictorAvailabilityTerminalFailure",
+      "Type": "Fail"
+    },
+    "PredictorAvailabilityDeferred": {
+      "Cause": "Predictor availability is waiting for missing producer receipts.",
+      "Error": "PredictorAvailabilityDeferred",
       "Type": "Fail"
     },
     "SignalMasterFailed": {
@@ -134,7 +157,10 @@
         {
           "BackoffRate": 2,
           "ErrorEquals": [
-            "States.ALL"
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
           ],
           "IntervalSeconds": 10,
           "MaxAttempts": 2
@@ -146,9 +172,15 @@
       "Type": "Choice",
       "Choices": [
         {"Variable": "$.monthly_context.statusCode", "NumericEquals": 200, "Next": "RunSignalMaster"},
-        {"Variable": "$.monthly_context.statusCode", "NumericEquals": 202, "Next": "WaitForMonthlySources"}
+        {"Variable": "$.monthly_context.statusCode", "NumericEquals": 202, "Next": "WaitForMonthlySources"},
+        {"Variable": "$.monthly_context.statusCode", "NumericEquals": 424, "Next": "MonthlySourceDeferred"}
       ],
       "Default": "MonthlySourceReadinessFailed"
+    },
+    "MonthlySourceDeferred": {
+      "Type": "Fail",
+      "Error": "MonthlySourceDeferred",
+      "Cause": "Required monthly sources remained unavailable through the bounded readiness deadline."
     },
     "WaitForMonthlySources": {
       "Type": "Wait",
@@ -1393,19 +1425,20 @@
                   {"Variable": "$.predictor", "StringEquals": "BrandInvest"},
                   {"Variable": "$.predictor", "StringEquals": "CF"},
                   {"Variable": "$.predictor", "StringEquals": "CashProd"},
+                  {"Variable": "$.predictor", "StringEquals": "CBOperProf"},
                   {"Variable": "$.predictor", "StringEquals": "ChEQ"},
                   {"Variable": "$.predictor", "StringEquals": "ChForecastAccrual"},
                   {"Variable": "$.predictor", "StringEquals": "ChInv"},
                   {"Variable": "$.predictor", "StringEquals": "ChInvIA"},
                   {"Variable": "$.predictor", "StringEquals": "ChNNCOA"},
                   {"Variable": "$.predictor", "StringEquals": "ChNWC"},
-                  {"Variable": "$.predictor", "StringEquals": "ConvDebt"},
-                  {"Variable": "$.predictor", "StringEquals": "CBOperProf"},
+                  {"Variable": "$.predictor", "StringEquals": "ChTax"},
                   {"Variable": "$.predictor", "StringEquals": "EntMult"},
                   {"Variable": "$.predictor", "StringEquals": "EquityDuration"},
                   {"Variable": "$.predictor", "StringEquals": "ExchSwitch"},
                   {"Variable": "$.predictor", "StringEquals": "ChAssetTurnover"},
                   {"Variable": "$.predictor", "StringEquals": "Coskewness"},
+                  {"Variable": "$.predictor", "StringEquals": "ConvDebt"},
                   {"Variable": "$.predictor", "StringEquals": "CustomerMomentum"},
                   {"Variable": "$.predictor", "StringEquals": "DelCOL"},
                   {"Variable": "$.predictor", "StringEquals": "DelDRC"},
@@ -1439,6 +1472,7 @@
                   {"Variable": "$.predictor", "StringEquals": "TotalAccruals"},
                   {"Variable": "$.predictor", "StringEquals": "VarCF"},
                   {"Variable": "$.predictor", "StringEquals": "XFIN"},
+                  {"Variable": "$.predictor", "StringEquals": "cfp"},
                   {"Variable": "$.predictor", "StringEquals": "ZZ1_AnalystValue_AOP_PredictedFE_IntrinsicValue"},
                   {"Variable": "$.predictor", "StringEquals": "ZZ1_EBM_BPEBM"},
                   {"Variable": "$.predictor", "StringEquals": "ZZ1_grcapx_grcapx1y_grcapx3y"},

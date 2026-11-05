@@ -448,7 +448,11 @@ class EuclideanInfraStack(Stack):
             rule_name="euclidean-storage-footprint-reporter-weekly",
             description="Weekly bounded S3 metadata footprint report",
             schedule=events.Schedule.cron(minute="0", hour="8", week_day="SUN"),
-            targets=[event_targets.LambdaFunction(footprint_function)],
+            targets=[event_targets.LambdaFunction(
+                footprint_function,
+                retry_attempts=0,
+                max_event_age=Duration.hours(1),
+            )],
         )
 
         # =====================================================================
