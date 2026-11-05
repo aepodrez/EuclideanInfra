@@ -456,6 +456,51 @@ class EuclideanInfraStack(Stack):
         # =====================================================================
         sns.CfnTopic(self, "NotificationsTopic", topic_name=TOPIC_NAME)
 
+        pending_alert = lambda_.Function(
+            self, "MonthlyPendingStatusAlert",
+            function_name="euclidean-monthly-pending-status-alert",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="lambda_function.lambda_handler",
+            code=lambda_.Code.from_asset(os.path.join(
+                LAMBDA_ASSETS_DIR, "monthly_pending_alert"
+            )),
+            timeout=Duration.minutes(3),
+            memory_size=256,
+            reserved_concurrent_executions=1,
+            environment={
+                "S3_BUCKET": BUCKET_NAME,
+                "STATUS_FUNCTION": "euclidean-predictor-availability",
+                "NOTIFICATIONS_TOPIC_ARN": TOPIC_ARN,
+            },
+        )
+        pending_alert.add_to_role_policy(iam.PolicyStatement(
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:euclidean-predictor-availability"],
+        ))
+        pending_alert.add_to_role_policy(iam.PolicyStatement(
+            actions=["s3:GetObject"],
+            resources=[
+                f"{BUCKET_ARN}/portfolio-construction/runs/*/optimal_portfolio_meta.json",
+                f"{BUCKET_ARN}/portfolio-construction/runs/*/optimal_portfolio.csv",
+            ],
+        ))
+        pending_alert.add_to_role_policy(iam.PolicyStatement(
+            actions=["s3:PutObject"],
+            resources=[f"{BUCKET_ARN}/control-plane/monthly-status-alerts/*"],
+        ))
+        pending_alert.add_to_role_policy(iam.PolicyStatement(
+            actions=["sns:Publish"], resources=[TOPIC_ARN],
+        ))
+        # EventBridge uses UTC. Exactly one of these two invocations is 9 a.m.
+        # in New York; the handler rejects the other after the DST conversion.
+        events.Rule(
+            self, "MonthlyPendingStatusSchedule",
+            rule_name="euclidean-monthly-pending-status-9am",
+            description="Report a specific month-end blocker at 9 a.m. New York time",
+            schedule=events.Schedule.cron(minute="0", hour="13,14", day="1"),
+            targets=[event_targets.LambdaFunction(pending_alert)],
+        )
+
         # =====================================================================
         # ECS cluster
         # =====================================================================
