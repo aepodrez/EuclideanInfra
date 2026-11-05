@@ -77,6 +77,9 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     high_memory_predictors = [part["StringEquals"] for part in choice["Choices"][0]["Or"]]
     assert len(high_memory_predictors) == len(set(high_memory_predictors))
     assert set(high_memory_predictors) == {
+        "AM", "AccrualsBM", "AdExp", "BM", "BMdec", "BookLeverage",
+        "BrandInvest", "CF", "CashProd", "ChEQ", "ChForecastAccrual",
+        "ChInv", "ChInvIA", "ChNNCOA", "ChNWC", "ConvDebt",
         "CBOperProf", "EntMult", "EquityDuration", "ExchSwitch",
         "ChAssetTurnover", "Coskewness", "CustomerMomentum", "DelCOL",
         "DelDRC", "DivYieldST", "Frontier", "IndMom",

@@ -1062,6 +1062,10 @@
                   "Value.$": "$.monthly_context.source_snapshot_sha256"
                 },
                 {
+                  "Name": "MONTHLY_SOURCE_SNAPSHOT_KEY",
+                  "Value.$": "$.monthly_context.source_snapshot_key"
+                },
+                {
                   "Name": "PREDICTOR_AVAILABILITY_KEY",
                   "Value.$": "$.predictor_availability_result.Payload.output"
                 },
@@ -1216,6 +1220,22 @@
             "Choices": [
               {
                 "Or": [
+                  {"Variable": "$.predictor", "StringEquals": "AM"},
+                  {"Variable": "$.predictor", "StringEquals": "AccrualsBM"},
+                  {"Variable": "$.predictor", "StringEquals": "AdExp"},
+                  {"Variable": "$.predictor", "StringEquals": "BM"},
+                  {"Variable": "$.predictor", "StringEquals": "BMdec"},
+                  {"Variable": "$.predictor", "StringEquals": "BookLeverage"},
+                  {"Variable": "$.predictor", "StringEquals": "BrandInvest"},
+                  {"Variable": "$.predictor", "StringEquals": "CF"},
+                  {"Variable": "$.predictor", "StringEquals": "CashProd"},
+                  {"Variable": "$.predictor", "StringEquals": "ChEQ"},
+                  {"Variable": "$.predictor", "StringEquals": "ChForecastAccrual"},
+                  {"Variable": "$.predictor", "StringEquals": "ChInv"},
+                  {"Variable": "$.predictor", "StringEquals": "ChInvIA"},
+                  {"Variable": "$.predictor", "StringEquals": "ChNNCOA"},
+                  {"Variable": "$.predictor", "StringEquals": "ChNWC"},
+                  {"Variable": "$.predictor", "StringEquals": "ConvDebt"},
                   {"Variable": "$.predictor", "StringEquals": "CBOperProf"},
                   {"Variable": "$.predictor", "StringEquals": "EntMult"},
                   {"Variable": "$.predictor", "StringEquals": "EquityDuration"},
