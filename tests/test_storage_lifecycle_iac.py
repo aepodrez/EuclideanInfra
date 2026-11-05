@@ -92,6 +92,13 @@ def test_weekly_schedules_reporter_bounds_and_permissions():
     }
     assert rules["euclidean-storage-retention-reconciler-weekly"]["Properties"]["ScheduleExpression"] == "cron(15 7 ? * SUN *)"
     assert rules["euclidean-storage-footprint-reporter-weekly"]["Properties"]["ScheduleExpression"] == "cron(0 8 ? * SUN *)"
+    footprint_target = rules[
+        "euclidean-storage-footprint-reporter-weekly"
+    ]["Properties"]["Targets"][0]
+    assert footprint_target["RetryPolicy"] == {
+        "MaximumEventAgeInSeconds": 3600,
+        "MaximumRetryAttempts": 0,
+    }
 
     function = next(
         resource for resource in template["Resources"].values()

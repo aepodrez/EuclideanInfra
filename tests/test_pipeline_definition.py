@@ -77,6 +77,9 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     high_memory_predictors = [part["StringEquals"] for part in choice["Choices"][0]["Or"]]
     assert len(high_memory_predictors) == len(set(high_memory_predictors))
     assert set(high_memory_predictors) == {
+        "AM", "AccrualsBM", "AdExp", "BM", "BMdec", "BookLeverage",
+        "BrandInvest", "CF", "CashProd", "ChEQ", "ChForecastAccrual",
+        "ChInv", "ChInvIA", "ChNNCOA", "ChNWC", "ChTax", "ConvDebt", "cfp",
         "CBOperProf", "EntMult", "EquityDuration", "ExchSwitch",
         "ChAssetTurnover", "Coskewness", "CustomerMomentum", "DelCOL",
         "DelDRC", "DivYieldST", "Frontier", "IndMom",
@@ -102,7 +105,10 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     assert task["TimeoutSeconds"] == 900
     assert task["Catch"][0]["Next"] == "RecordPredictorFailure"
     assert task["Retry"] == [{
-        "ErrorEquals": ["States.TaskFailed"],
+        "ErrorEquals": [
+            "AmazonECS.Unknown", "ECS.AmazonECSException",
+            "ECS.ServiceException", "ECS.ThrottlingException",
+        ],
         "IntervalSeconds": 10,
         "BackoffRate": 2,
         "MaxAttempts": 2,
@@ -140,6 +146,8 @@ def test_monthly_start_waits_for_exact_source_readiness_and_seals_dispatch():
          "Next": "RunSignalMaster"},
         {"Variable": "$.monthly_context.statusCode", "NumericEquals": 202,
          "Next": "WaitForMonthlySources"},
+        {"Variable": "$.monthly_context.statusCode", "NumericEquals": 424,
+         "Next": "MonthlySourceDeferred"},
     ]
     assert states["WaitForMonthlySources"] == {
         "Type": "Wait", "Seconds": 900, "Next": "ResolveMonthlyContext",
@@ -172,9 +180,10 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
     }
     assert availability["Next"] == "CheckPredictorAvailability"
     gate = states["CheckPredictorAvailability"]
+    success_choice = next(item for item in gate["Choices"] if "And" in item)
     variables = {
         condition["Variable"]
-        for condition in gate["Choices"][0]["And"]
+        for condition in success_choice["And"]
     }
     assert {
         "$.predictor_availability_result.Payload.states.failed_quality",
@@ -184,9 +193,27 @@ def test_availability_reconciliation_gates_alpha_on_potent_catalog():
     assert gate["Default"] == "PredictorAvailabilityFailed"
     numeric_equals = {
         (condition.get("Variable"), condition.get("NumericEquals"))
-        for condition in gate["Choices"][0]["And"]
+        for condition in success_choice["And"]
     }
     assert ("$.predictor_availability_result.Payload.row_count", 212) in numeric_equals
+    assert gate["Choices"][:2] == [
+        {
+            "Variable": "$.predictor_availability_result.Payload.status",
+            "StringEquals": "terminal_failure",
+            "Next": "PredictorAvailabilityTerminalFailure",
+        },
+        {
+            "Variable": "$.predictor_availability_result.Payload.status",
+            "StringEquals": "deferred_dependency",
+            "Next": "PredictorAvailabilityDeferred",
+        },
+    ]
+    service_errors = [
+        "Lambda.ServiceException", "Lambda.AWSLambdaException",
+        "Lambda.SdkClientException", "Lambda.TooManyRequestsException",
+    ]
+    assert availability["Retry"][0]["ErrorEquals"] == service_errors
+    assert states["ResolveMonthlyContext"]["Retry"][0]["ErrorEquals"] == service_errors
 
 
 def test_monthly_context_is_resolved_once_and_pins_alpha_catalog():
@@ -263,9 +290,11 @@ def test_signal_master_is_gated_before_predictors():
 
 def test_preflight_stops_before_alpha_and_production_defaults_fail_closed():
     states = _definition()["States"]
-    assert states["CheckPredictorAvailability"]["Choices"][0]["Next"] == (
-        "CheckPreflightComplete"
+    success = next(
+        item for item in states["CheckPredictorAvailability"]["Choices"]
+        if "And" in item
     )
+    assert success["Next"] == "CheckPreflightComplete"
     assert states["CheckPreflightComplete"]["Choices"][0] == {
         "BooleanEquals": True,
         "Next": "PreflightComplete",
