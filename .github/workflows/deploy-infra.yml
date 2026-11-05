@@ -96,3 +96,5 @@ jobs:
         run: |
           npx --yes aws-cdk@2 synth
           python tools/deploy_scoped_monthly.py --sha "$GITHUB_SHA" --execute
+          npx --yes aws-cdk@2 deploy EuclideanMonthlyPendingAlert \
+            --exclusively --require-approval never
