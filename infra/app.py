@@ -5,6 +5,7 @@ import os
 import aws_cdk as cdk
 
 from stacks.euclidean_infra_stack import EuclideanInfraStack
+from stacks.monthly_pending_alert_stack import MonthlyPendingAlertStack
 
 app = cdk.App()
 
@@ -15,6 +16,12 @@ EuclideanInfraStack(
     app,
     "EuclideanInfra",
     stack_name="euclidean-infra",
+    env=cdk.Environment(account=account, region=region),
+)
+MonthlyPendingAlertStack(
+    app,
+    "EuclideanMonthlyPendingAlert",
+    stack_name="euclidean-monthly-pending-alert",
     env=cdk.Environment(account=account, region=region),
 )
 

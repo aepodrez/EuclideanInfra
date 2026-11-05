@@ -12,6 +12,24 @@ alert = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(alert)
 
 
+def test_alert_is_isolated_for_scoped_release():
+    import aws_cdk as cdk
+    from aws_cdk import assertions
+    from infra.stacks.monthly_pending_alert_stack import MonthlyPendingAlertStack
+
+    app = cdk.App()
+    stack = MonthlyPendingAlertStack(app, "EuclideanMonthlyPendingAlert",
+                                    env=cdk.Environment(account="954976294836", region="us-east-1"))
+    resources = assertions.Template.from_stack(stack).to_json()["Resources"]
+    assert {row["Type"] for row in resources.values()} == {
+        "AWS::Lambda::Function", "AWS::IAM::Role", "AWS::IAM::Policy",
+        "AWS::Events::Rule", "AWS::Lambda::Permission",
+    }
+    rules = [row for row in resources.values() if row["Type"] == "AWS::Events::Rule"]
+    assert len(rules) == 1
+    assert rules[0]["Properties"]["ScheduleExpression"] == "cron(0 13,14 1 * ? *)"
+
+
 def test_nine_am_checkpoint_sends_one_specific_pending_alert(monkeypatch):
     now = datetime(2026, 12, 1, 14, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(alert, "datetime", SimpleNamespace(now=lambda tz: now))
