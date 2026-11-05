@@ -110,12 +110,7 @@ def test_high_memory_predictors_use_bounded_on_demand_task():
     ]
     assert task["TimeoutSeconds"] == 900
     assert task["Catch"][0]["Next"] == "RecordPredictorFailure"
-    assert task["Retry"] == [{
-        "ErrorEquals": ["States.TaskFailed"],
-        "IntervalSeconds": 10,
-        "BackoffRate": 2,
-        "MaxAttempts": 2,
-    }]
+    assert "Retry" not in task  # one bounded attempt; exact failed groups can be repaired later
     assert states["CheckHighMemoryPredictorExit"]["Choices"] == [{
         "Variable": "$.ecs_result.Containers[0].ExitCode",
         "NumericEquals": 0,

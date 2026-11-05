@@ -1477,9 +1477,6 @@
             "ResultPath": "$.ecs_result",
             "TimeoutSeconds": 900,
             "Next": "CheckHighMemoryPredictorExit",
-            "Retry": [
-              {"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 10, "BackoffRate": 2, "MaxAttempts": 2}
-            ],
             "Catch": [
               {"ErrorEquals": ["States.ALL"], "ResultPath": "$.failure", "Next": "RecordPredictorFailure"}
             ]
