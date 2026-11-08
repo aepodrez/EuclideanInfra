@@ -174,8 +174,44 @@ def build_report(s3: Any, bucket: str, now: datetime, *, max_objects: int = MAX_
             stop("missing-continuation-token")
             break
 
-    completed: set[str] = set()
     errors: list[dict[str, str]] = []
+
+    # A single top-level alternative-data scan can occupy one worker for the
+    # entire Lambda timeout. Discover its disjoint children before parallel
+    # listing; direct objects are counted here and children are scanned once.
+    for parent in ("alternative-data/", "alternative-data/company-web/"):
+        if parent not in prefixes or stopped.is_set():
+            continue
+        children: set[str] = set()
+        token = None
+        try:
+            while not stopped.is_set():
+                if not reserve_page():
+                    break
+                args = {"Bucket": bucket, "Prefix": parent,
+                        "Delimiter": "/", "MaxKeys": 1000}
+                if token:
+                    args["ContinuationToken"] = token
+                page = s3.list_objects_v2(**args)
+                for item in accept_items(list(page.get("Contents", []))):
+                    _record_object(groups, item, cutoff_7d, cutoff_30d)
+                children.update(
+                    str(item.get("Prefix") or "")
+                    for item in page.get("CommonPrefixes", []) if item.get("Prefix")
+                )
+                if not page.get("IsTruncated"):
+                    prefixes.remove(parent)
+                    prefixes.update(children)
+                    break
+                token = page.get("NextContinuationToken")
+                if not token:
+                    stop("missing-continuation-token")
+                    break
+        except Exception as exc:
+            errors.append({"prefix": parent, "error_type": type(exc).__name__})
+            stop("list-error")
+
+    completed: set[str] = set()
 
     def scan_prefix(prefix: str) -> tuple[str, dict[str, dict[str, Any]], bool]:
         local = _empty_groups()
