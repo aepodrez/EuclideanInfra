@@ -47,7 +47,7 @@ def test_report_aggregates_classes_growth_eligibility_and_cost():
     assert report["scan"]["estimated_list_cost_usd"] == 0.000005
     assert report["scan"]["max_objects"] == 5_000_000
     assert report["scan"]["max_list_requests"] == 6_000
-    assert report["scan"]["workers"] == 8
+    assert report["scan"]["workers"] == 24
     assert report["scan"]["unfinished_prefixes"] == []
     assert report["totals"]["bytes"] == 900_050
     assert report["totals"]["new_7d_standard_bytes"] == 300_000

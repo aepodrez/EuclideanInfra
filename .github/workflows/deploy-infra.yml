@@ -112,10 +112,14 @@ jobs:
           git fetch --no-tags origin main
           test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
           changed="$(git diff --name-only "$GITHUB_SHA^" "$GITHUB_SHA")"
-          if grep -Ev '^(\.github/workflows/deploy-infra\.yml|lambdas/storage_footprint_reporter/lambda_function\.py|tests/test_storage_footprint_reporter\.py)$' <<< "$changed" | grep -q .; then
+          if grep -Ev '^(\.github/workflows/deploy-infra\.yml|lambdas/storage_footprint_reporter/lambda_function\.py|infra/stacks/euclidean_infra_stack\.py|tests/test_storage_footprint_reporter\.py|tests/test_storage_lifecycle_iac\.py)$' <<< "$changed" | grep -q .; then
             echo 'Scoped storage release contains unrelated paths' >&2
             exit 1
           fi
+          aws lambda update-function-configuration \
+            --function-name euclidean-storage-footprint-reporter \
+            --memory-size 1536 >/dev/null
+          aws lambda wait function-updated --function-name euclidean-storage-footprint-reporter
           (
             cd lambdas/storage_footprint_reporter
             zip -q /tmp/storage-footprint-reporter.zip lambda_function.py
@@ -133,3 +137,6 @@ jobs:
             --function-name euclidean-storage-footprint-reporter \
             --query '[State,LastUpdateStatus]' --output text)"
           test "$state" = $'Active\tSuccessful'
+          test "$(aws lambda get-function-configuration \
+            --function-name euclidean-storage-footprint-reporter \
+            --query MemorySize --output text)" = 1536

@@ -105,7 +105,7 @@ def test_weekly_schedules_reporter_bounds_and_permissions():
         if resource["Type"] == "AWS::Lambda::Function"
         and resource["Properties"].get("FunctionName") == "euclidean-storage-footprint-reporter"
     )
-    assert function["Properties"]["MemorySize"] == 256
+    assert function["Properties"]["MemorySize"] == 1536
     assert function["Properties"]["ReservedConcurrentExecutions"] == 1
     assert function["Properties"]["Environment"]["Variables"]["MAX_OBJECTS"] == "5000000"
     assert function["Properties"]["Environment"]["Variables"]["MAX_LIST_REQUESTS"] == "6000"
