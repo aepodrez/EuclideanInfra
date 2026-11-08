@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import boto3
+from botocore.config import Config
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -40,7 +41,7 @@ GROUPS = (
     ("alternative-data/common-crawl/", "Common Crawl"),
     ("alternative-data/_runs/", "published alternative-data runs"),
 )
-_s3 = boto3.client("s3")
+_s3 = boto3.client("s3", config=Config(max_pool_connections=48))
 
 
 def _group(key: str) -> str:
@@ -114,7 +115,7 @@ def _merge_groups(
 
 
 def build_report(s3: Any, bucket: str, now: datetime, *, max_objects: int = MAX_OBJECTS,
-                 max_pages: int = MAX_PAGES, max_workers: int = 8,
+                 max_pages: int = MAX_PAGES, max_workers: int = 24,
                  remaining_time_ms: Any | None = None) -> dict[str, Any]:
     started = time.monotonic()
     groups = _empty_groups()

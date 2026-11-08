@@ -423,7 +423,7 @@ class EuclideanInfraStack(Stack):
                 LAMBDA_ASSETS_DIR, "storage_footprint_reporter"
             )),
             timeout=Duration.minutes(15),
-            memory_size=256,
+            memory_size=1536,
             reserved_concurrent_executions=1,
             environment={
                 "S3_BUCKET": BUCKET_NAME,
