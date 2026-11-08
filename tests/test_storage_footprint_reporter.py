@@ -99,6 +99,41 @@ def test_parallel_prefix_scan_includes_root_objects_exactly_once():
     assert report["totals"]["bytes"] == 21
 
 
+def test_alternative_data_split_counts_direct_and_nested_objects_once():
+    now = datetime(2026, 11, 8, tzinfo=timezone.utc)
+
+    class NestedS3:
+        def list_objects_v2(self, **kwargs):
+            prefix = kwargs.get("Prefix")
+            if prefix is None:
+                return {"CommonPrefixes": [{"Prefix": "alternative-data/"}],
+                        "IsTruncated": False}
+            if kwargs.get("Delimiter") == "/":
+                if prefix == "alternative-data/":
+                    return {"Contents": [{"Key": "alternative-data/root", "Size": 1,
+                                          "LastModified": now}],
+                            "CommonPrefixes": [
+                                {"Prefix": "alternative-data/ats/"},
+                                {"Prefix": "alternative-data/company-web/"}],
+                            "IsTruncated": False}
+                if prefix == "alternative-data/company-web/":
+                    return {"Contents": [{"Key": "alternative-data/company-web/root",
+                                          "Size": 2, "LastModified": now}],
+                            "CommonPrefixes": [
+                                {"Prefix": "alternative-data/company-web/archive/"},
+                                {"Prefix": "alternative-data/company-web/direct/"}],
+                            "IsTruncated": False}
+            return {"Contents": [{"Key": prefix + "object", "Size": 10,
+                                  "LastModified": now}], "IsTruncated": False}
+
+    report = build_report(NestedS3(), "bucket", now)
+    assert report["scan"]["status"] == "complete"
+    assert report["scan"]["pages"] == 6
+    assert report["totals"]["objects"] == 5
+    assert report["totals"]["bytes"] == 33
+    assert report["groups"]["company-web"]["bytes"] == 22
+
+
 def test_deadline_writes_versioned_diagnostic_without_replacing_latest(monkeypatch):
     now = datetime.now(timezone.utc)
     s3 = PrefixS3(now)
