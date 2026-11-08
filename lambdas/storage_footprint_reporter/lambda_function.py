@@ -176,10 +176,21 @@ def build_report(s3: Any, bucket: str, now: datetime, *, max_objects: int = MAX_
 
     errors: list[dict[str, str]] = []
 
-    # A single top-level alternative-data scan can occupy one worker for the
-    # entire Lambda timeout. Discover its disjoint children before parallel
-    # listing; direct objects are counted here and children are scanned once.
-    for parent in ("alternative-data/", "alternative-data/company-web/"):
+    # Split known high-volume trees at their existing partition boundaries.
+    # Delimiter discovery counts direct objects once and hands disjoint child
+    # prefixes to the parallel scan. In particular, ATS and company-web raw
+    # objects are already partitioned into 256 two-character shards.
+    for parent in (
+        "data-ingress/",
+        "alternative-data/",
+        "alternative-data/company-web/",
+        "alternative-data/company-web/direct/",
+        "alternative-data/company-web/direct/raw/",
+        "alternative-data/ats/",
+        "alternative-data/ats/raw/",
+        "alternative-data/wikimedia/",
+        "alternative-data/wikimedia/raw/",
+    ):
         if parent not in prefixes or stopped.is_set():
             continue
         children: set[str] = set()

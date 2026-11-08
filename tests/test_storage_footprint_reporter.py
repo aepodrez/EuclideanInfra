@@ -134,6 +134,39 @@ def test_alternative_data_split_counts_direct_and_nested_objects_once():
     assert report["groups"]["company-web"]["bytes"] == 22
 
 
+def test_sharded_raw_and_data_ingress_prefixes_are_disjoint():
+    now = datetime(2026, 11, 8, tzinfo=timezone.utc)
+    children = {
+        None: ["alternative-data/", "data-ingress/"],
+        "alternative-data/": ["alternative-data/ats/"],
+        "alternative-data/ats/": ["alternative-data/ats/raw/"],
+        "alternative-data/ats/raw/": [
+            "alternative-data/ats/raw/00/", "alternative-data/ats/raw/01/"],
+        "data-ingress/": ["data-ingress/pit/", "data-ingress/filings/"],
+    }
+
+    class ShardedS3:
+        def list_objects_v2(self, **kwargs):
+            prefix = kwargs.get("Prefix")
+            if kwargs.get("Delimiter") == "/":
+                return {
+                    "Contents": ([{"Key": prefix + "root", "Size": 1,
+                                   "LastModified": now}] if prefix else []),
+                    "CommonPrefixes": [{"Prefix": child}
+                                       for child in children.get(prefix, [])],
+                    "IsTruncated": False,
+                }
+            assert prefix not in children
+            return {"Contents": [{"Key": prefix + "object", "Size": 10,
+                                  "LastModified": now}], "IsTruncated": False}
+
+    report = build_report(ShardedS3(), "bucket", now)
+    assert report["scan"]["status"] == "complete"
+    assert report["scan"]["pages"] == 9
+    assert report["totals"]["objects"] == 8
+    assert report["totals"]["bytes"] == 44
+
+
 def test_deadline_writes_versioned_diagnostic_without_replacing_latest(monkeypatch):
     now = datetime.now(timezone.utc)
     s3 = PrefixS3(now)
