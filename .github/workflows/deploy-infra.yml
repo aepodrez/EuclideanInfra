@@ -39,15 +39,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Require explicit deployment scope
         run: |
           message="$(git log -1 --format=%s)"
-          if [[ "$message" == *'[full-infra-deploy]'* && "$message" == *'[scoped-monthly-readiness]'* ]]; then
+          scopes=0
+          [[ "$message" == *'[full-infra-deploy]'* ]] && scopes=$((scopes + 1))
+          [[ "$message" == *'[scoped-monthly-readiness]'* ]] && scopes=$((scopes + 1))
+          [[ "$message" == *'[scoped-storage-footprint]'* ]] && scopes=$((scopes + 1))
+          if [[ "$scopes" -gt 1 ]]; then
             echo 'Conflicting deployment scopes' >&2
             exit 1
           fi
-          if [[ "$message" != *'[full-infra-deploy]'* && "$message" != *'[scoped-monthly-readiness]'* ]]; then
+          if [[ "$scopes" -ne 1 ]]; then
             echo 'Infra deployment requires an explicit scoped or full release marker' >&2
             exit 1
           fi
@@ -98,3 +104,32 @@ jobs:
           python tools/deploy_scoped_monthly.py --sha "$GITHUB_SHA" --execute
           npx --yes aws-cdk@2 deploy EuclideanMonthlyPendingAlert \
             --exclusively --require-approval never
+
+      - name: Deploy scoped storage-footprint reporter code
+        if: ${{ contains(github.event.head_commit.message, '[scoped-storage-footprint]') }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          changed="$(git diff --name-only "$GITHUB_SHA^" "$GITHUB_SHA")"
+          if grep -Ev '^(\.github/workflows/deploy-infra\.yml|lambdas/storage_footprint_reporter/lambda_function\.py|tests/test_storage_footprint_reporter\.py)$' <<< "$changed" | grep -q .; then
+            echo 'Scoped storage release contains unrelated paths' >&2
+            exit 1
+          fi
+          (
+            cd lambdas/storage_footprint_reporter
+            zip -q /tmp/storage-footprint-reporter.zip lambda_function.py
+          )
+          expected="$(openssl dgst -sha256 -binary /tmp/storage-footprint-reporter.zip | openssl base64 -A)"
+          aws lambda update-function-code \
+            --function-name euclidean-storage-footprint-reporter \
+            --zip-file fileb:///tmp/storage-footprint-reporter.zip >/dev/null
+          aws lambda wait function-updated --function-name euclidean-storage-footprint-reporter
+          actual="$(aws lambda get-function-configuration \
+            --function-name euclidean-storage-footprint-reporter \
+            --query CodeSha256 --output text)"
+          test "$actual" = "$expected"
+          state="$(aws lambda get-function-configuration \
+            --function-name euclidean-storage-footprint-reporter \
+            --query '[State,LastUpdateStatus]' --output text)"
+          test "$state" = $'Active\tSuccessful'
